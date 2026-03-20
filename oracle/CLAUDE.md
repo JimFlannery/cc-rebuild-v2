@@ -30,22 +30,35 @@ The oracle fetches data directly from NOAA SWPC and Kyoto WDC at runtime — no 
 
 ### NOAA SWPC — `https://services.swpc.noaa.gov`
 
-No API key required.
+No API key required. All five indices are served from the same base URL.
 
-| Index | NOAA path | Field used | Update frequency |
-|---|---|---|---|
-| Kp-Index | `json/planetary_k_index_1m.json` | `estimated_kp` (decimal) | 1 minute |
-| Solar X-Ray Flux | `json/goes/primary/xrays-1-day.json` | `flux` W/m², channel `0.1-0.8nm` | 1 minute |
-| Solar Proton Flux | `json/goes/primary/integral-protons-1-day.json` | `flux` pfu, channel `>=10 MeV` | 5 minutes |
-| Solar Radio Flux (F10.7) | `json/f107_cm_flux.json` | `flux` sfu (newest-first array) | 3× per day |
+#### Development / Testing (current)
 
-### Kyoto WDC — Dst Index
+Lower-frequency endpoints suitable for devnet testing. Less noisy, easier to observe threshold crossings during development.
 
-| Index | Source | Field used | Update frequency |
-|---|---|---|---|
-| Dst | `KYOTO_DST_URL` (HTML page) | Parsed from `<pre>` table, last non-sentinel nT value | Hourly |
+| Index | NOAA path | Format | Value field | Update frequency |
+|---|---|---|---|---|
+| Kp-Index | `products/noaa-planetary-k-index.json` | Array of arrays | `row[1]` (string → float) — max Kp over 3-hour period | 3 hours |
+| Dst Index | `products/kyoto-dst.json` | Array of arrays | `row[1]` (number) — hourly nT value | 1 hour |
 
-Kyoto uses `999` / `9999` as missing-data sentinels. The parser walks backwards from the most recent entry to find the last valid value.
+Both files use the same structure: row `[0]` is the header `["time_tag", ...]`; subsequent rows are data; last row is most recent.
+
+#### Production (switch when ready)
+
+| Index | NOAA path | Format | Value field | Update frequency |
+|---|---|---|---|---|
+| Kp-Index | `json/planetary_k_index_1m.json` | Array of objects | `estimated_kp` (decimal) | 1 minute |
+| Dst Index | `products/kyoto-dst.json` | Array of arrays | `row[1]` (same) | 1 hour |
+
+To switch Kp to production: update `fetchKp.ts` endpoint and parse `estimated_kp` from the object format. Update `config.ts` `kpMs` from `3 * 60 * 60_000` to `60_000`.
+
+#### Other Indices (unchanged)
+
+| Index | NOAA path | Format | Value field | Update frequency |
+|---|---|---|---|---|
+| Solar X-Ray Flux | `json/goes/primary/xrays-1-day.json` | Array of objects | `flux` W/m², channel `0.1-0.8nm` | 1 minute |
+| Solar Proton Flux | `json/goes/primary/integral-protons-1-day.json` | Array of objects | `flux` pfu, channel `>=10 MeV` | 5 minutes |
+| Solar Radio Flux (F10.7) | `json/f107_cm_flux.json` | Array of objects | `flux` sfu (newest-first) | 3× per day |
 
 ---
 
@@ -149,3 +162,18 @@ oracle/
 4. Add SPL token escrow to `settle` — transfer collateral to winner's token account.
 5. Wire up MySQL `Status` field updates after each on-chain event.
 6. Write integration tests (`smartcontracts/tests/condition_cover.ts`).
+
+---
+
+## Future: Optimistic Oracle (post-devnet)
+
+After devnet, the single-step settlement flow will be upgraded to an **optimistic oracle** pattern to allow a dispute window before funds are released.
+
+**Planned two-step flow:**
+1. Oracle submits `propose(outcome)` — sets `proposed_outcome` and starts a `dispute_deadline` clock.
+2. After the dispute window passes with no challenge → `finalize()` releases escrowed funds to the winner.
+3. If disputed during the window → a resolution process (governance / multisig) adjudicates.
+
+This requires new oracle-side logic to submit `propose` instead of `settle`, poll for the dispute deadline, and call `finalize` once the window closes.
+
+**Do not implement during devnet.** The current `settle` instruction is the correct approach for development and testing.

@@ -1,39 +1,39 @@
 import { config } from '../config';
 import type { IndexReading } from './types';
 
-interface KpRecord {
-  time_tag: string;
-  kp_index: number;
-  estimated_kp: number;
-  /** Alphanumeric Kp code, e.g. "3P". Suffix: Z = lower, M = middle, P = plus/upper third. */
-  kp: string;
-}
+// Row layout after the header: [time_tag, Kp, a_running, station_count]
+type KpRow = [string, string, string, string];
 
 /**
- * Fetch the most recent planetary Kp-Index from NOAA SWPC.
+ * Fetch the most recent 3-hourly Kp-Index from NOAA SWPC.
  *
- * Source:  json/planetary_k_index_1m.json  (updates every minute)
- * Returns: estimated_kp — decimal precision Kp (e.g. 3.33 for "3P").
+ * Source:  products/noaa-planetary-k-index.json  (updates every 3 hours)
+ * Format:  Array of arrays; first row is the header.
+ * Value:   Kp at index [1] — the maximum Kp achieved during that 3-hour period.
  *
- * Kp ≥ 5 → geomagnetic storm (G1+).
- * Contracts store IndexLevel as the integer or decimal Kp threshold.
+ * Used for development/testing. Switch to planetary_k_index_1m.json for
+ * production (1-minute updates, estimated_kp field).
  */
 export async function fetchKp(): Promise<IndexReading> {
-  const url = `${config.noaa.baseUrl}/json/planetary_k_index_1m.json`;
+  const url = `${config.noaa.baseUrl}/products/noaa-planetary-k-index.json`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`NOAA Kp fetch failed: ${res.status} ${res.statusText}`);
   }
 
-  const records: KpRecord[] = await res.json();
-  if (!records.length) throw new Error('NOAA Kp: empty response');
+  const rows: KpRow[] = await res.json();
+  if (rows.length < 2) throw new Error('NOAA Kp: no data rows (only header)');
 
-  // Records are chronological; the last entry is the most recent minute.
-  const latest = records[records.length - 1];
+  // Row 0 is the header ["time_tag", "Kp", ...]; last row is most recent.
+  const latest = rows[rows.length - 1];
+  const value = parseFloat(latest[1]);
+  if (isNaN(value)) {
+    throw new Error(`NOAA Kp: could not parse value from row: ${JSON.stringify(latest)}`);
+  }
 
   return {
     indexName: 'Kp',
-    value: latest.estimated_kp,
-    timeTag: latest.time_tag,
+    value,
+    timeTag: latest[0],
   };
 }

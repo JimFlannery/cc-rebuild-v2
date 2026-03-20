@@ -251,6 +251,27 @@ The MySQL `Orders` and `Contracts` tables mirror on-chain state for the website 
 
 ---
 
+## Future: Optimistic Oracle (post-devnet)
+
+After devnet, the single-step `settle` instruction will be replaced with an **optimistic oracle** pattern to allow a dispute window before funds are released.
+
+**Planned instruction set (replaces `settle`):**
+
+| Instruction | Signer | Description |
+|---|---|---|
+| `propose` | Oracle wallet | Sets `proposed_outcome` + `dispute_deadline` on Contract account |
+| `dispute` | Any wallet | Raises a challenge during the dispute window |
+| `finalize` | Oracle wallet | Releases escrowed funds after dispute window closes with no challenge |
+
+**Contract account additions needed:**
+- `proposed_outcome: Option<u8>` — oracle's submitted outcome
+- `dispute_deadline: i64` — unix timestamp when the window closes
+- `disputed: bool` — whether a challenge has been raised
+
+**Do not implement during devnet.** The current `settle` instruction is the correct approach for development and testing. When designing new account fields, leave space in `Contract::LEN` for the above additions.
+
+---
+
 ## Reference
 
 - [Anchor Docs](https://www.anchor-lang.com/docs)
