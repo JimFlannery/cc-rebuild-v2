@@ -1,0 +1,41 @@
+name: Deploy Website
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
+
+jobs:
+  deploy:
+    name: Deploy Next.js to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "── Pulling latest code ──"
+            git pull origin main
+
+            echo "── Installing dependencies ──"
+            cd website
+            npm ci
+
+            echo "── Building ──"
+            npm run build
+
+            echo "── Restarting PM2 process ──"
+            pm2 restart website || pm2 start npm --name "website" -- start
+
+            echo "── Deploy complete ──"
+            pm2 status website

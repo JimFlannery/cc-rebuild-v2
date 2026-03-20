@@ -1,0 +1,37 @@
+# ── Secrets — never commit these ─────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*-keypair.json          # Solana keypairs (program, oracle wallet, etc.)
+*.pem                   # AWS EC2 SSH keys
+
+# ── Oracle ────────────────────────────────────────────────────────────────────
+oracle/node_modules/
+oracle/dist/            # TypeScript compiled output
+oracle/.env*            # catches .env, .env.local, .env.production, etc.
+!oracle/.env.example    # but keep the template
+
+# ── Smart contracts ───────────────────────────────────────────────────────────
+# (smartcontracts/.gitignore handles target/, .anchor/, node_modules/)
+# Extra coverage at root level:
+smartcontracts/target/
+smartcontracts/.anchor/test-ledger/
+
+# ── Website ───────────────────────────────────────────────────────────────────
+# (website/.gitignore handles node_modules/, .next/, .env*)
+website/node_modules/
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json  # personal editor settings; keep .vscode/extensions.json if desired
+
+# ── Learning Materials ───────────────────────────────────────────────────────────────
+
+mock-up-of-cards.jpeg
+mysql_schema.docx
+
