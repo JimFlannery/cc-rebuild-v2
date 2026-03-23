@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="400" viewBox="-200 -200 400 400" xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <clipPath id="globe-clip"><circle cx="0" cy="0" r="90"/></clipPath>
+  </defs>
+
+  <!-- Dark circle background -->
+  <circle cx="0" cy="0" r="190" fill="#071828"/>
+
+  <!-- Globe fill -->
+  <circle cx="0" cy="0" r="90" fill="#0d3560"/>
+
+  <!-- Meridian ellipses (vertical) -->
+  <ellipse cx="0" cy="0" rx="28" ry="90" fill="none" stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.5"/>
+  <ellipse cx="0" cy="0" rx="55" ry="90" fill="none" stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.3"/>
+  <ellipse cx="0" cy="0" rx="80" ry="90" fill="none" stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.15"/>
+
+  <!-- Latitude lines (horizontal), clipped to globe -->
+  <g clip-path="url(#globe-clip)">
+    <line x1="-90" y1="-70" x2="90" y2="-70" stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.2"/>
+    <line x1="-90" y1="-45" x2="90" y2="-45" stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.35"/>
+    <line x1="-90" y1="0"   x2="90" y2="0"   stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.5"/>
+    <line x1="-90" y1="45"  x2="90" y2="45"  stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.35"/>
+    <line x1="-90" y1="70"  x2="90" y2="70"  stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.2"/>
+  </g>
+
+  <!-- Central vertical axis -->
+  <line x1="0" y1="-90" x2="0" y2="90" stroke="#3a8fd4" stroke-width="1.2" stroke-opacity="0.4"/>
+
+  <!-- Globe outline -->
+  <circle cx="0" cy="0" r="90" fill="none" stroke="#2a6db5" stroke-width="2"/>
+
+  <!-- LEFT C outer arc — centered on origin, opens right -->
+  <path d="M 0,-159 A 159,159 0 1,0 0,159"
+        fill="none" stroke="#4aa8e8" stroke-width="16" stroke-linecap="round"/>
+  <!-- LEFT C inner arc — centered on origin, opens right -->
+  <path d="M 0,-131 A 131,131 0 1,0 0,131"
+        fill="none" stroke="#4aa8e8" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Outer ring -->
+  <circle cx="0" cy="0" r="187" fill="none" stroke="#1e5a9c" stroke-width="1.2" stroke-opacity="0.4"/>
+
+</svg>

@@ -209,7 +209,75 @@ website/
 │   └── globals.css
 ├── components/
 │   ├── ui/                 ← primitive UI components
-│   └── ...                 ← feature-level components
-├── lib/                    ← utilities, db client, solana helpers
+│   ├── nav.tsx             ← top navigation (auth-state-aware)
+│   ├── theme-provider.tsx  ← next-themes wrapper
+│   ├── theme-toggle.tsx    ← light/dark toggle button
+│   ├── tooltip.tsx         ← hover tooltip primitive
+│   └── wallet-provider.tsx ← Solana wallet adapter wrapper
+├── lib/
+│   ├── auth.ts             ← Better Auth server config
+│   ├── auth-client.ts      ← Better Auth browser client (useSession, signIn, signOut)
+│   ├── db.ts               ← mysql2 connection pool
+│   └── utils.ts            ← cn() helper (clsx + tailwind-merge)
 └── public/
+```
+
+---
+
+## Authentication & Access Flow
+
+### Library
+**Better Auth** (`better-auth`) — self-hosted, App Router native, MySQL adapter built-in.
+
+### Key Files
+| File | Purpose |
+|---|---|
+| `lib/auth.ts` | Server-side auth config — email/password, custom user fields |
+| `lib/auth-client.ts` | Browser client — exports `useSession`, `signIn`, `signOut`, `signUp` |
+| `app/api/auth/[...all]/route.ts` | Better Auth catch-all API handler |
+
+### Custom User Fields
+Better Auth's `user` table is extended with two fields:
+
+| Field | Type | Default | Set by |
+|---|---|---|---|
+| `kycVerified` | boolean | `false` | KYC/AML webhook (third-party) — never by user input |
+| `walletAddress` | string (nullable) | `null` | Server action after Phantom wallet connection is confirmed |
+
+### Access States
+
+The site is publicly browsable. Gated features depend on the user's combined login + KYC + wallet state:
+
+| State | Login | KYC | Wallet | Access |
+|---|---|---|---|---|
+| 1 — Guest | ✗ | — | — | Browse only. No profile dropdown, no wallet button. |
+| 2 — Logged in, unverified | ✓ | ✗ | — | Profile dropdown visible. Connect Wallet shown but **disabled** with tooltip: *"Complete identity verification to connect a wallet"*. |
+| 3 — Logged in, KYC verified | ✓ | ✓ | ✗ | Connect Wallet button becomes active. |
+| 4 — Logged in, KYC verified, wallet connected | ✓ | ✓ | ✓ | Full access. Truncated wallet address replaces Connect Wallet button. Orders can be created. |
+
+### Nav Button Logic (components/nav.tsx)
+```
+isLoggedIn = !!session
+kycVerified = session?.user?.kycVerified ?? false
+
+Not logged in  → Login button only
+Logged in      → Profile dropdown + wallet button:
+  connected         → address pill (click to disconnect)
+  !connected + KYC  → active Connect Wallet
+  !connected - KYC  → disabled Connect Wallet + tooltip
+```
+
+### Rationale for Hiding Wallet Until Login + KYC
+- KYC/AML compliance is tied to the user account, not the wallet. A wallet alone proves no identity.
+- Forces the correct onboarding sequence: **Register → Login → KYC/AML → Connect Wallet → Trade**.
+- Prevents anonymous wallet associations, simplifying the compliance audit trail.
+
+### DB Tables Created by Better Auth (via migrate)
+`user`, `session`, `account`, `verification` — all managed by Better Auth. Do not edit these manually. Re-run `npx @better-auth/cli migrate --config lib/auth.ts` after any change to `lib/auth.ts`.
+
+### Environment Variables Required
+```
+BETTER_AUTH_SECRET=<random 32+ byte secret>
+BETTER_AUTH_URL=http://localhost:3000          # server-side
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000  # client-side
 ```

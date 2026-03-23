@@ -39,11 +39,13 @@ cc-rebuild-v2/
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS 4 |
+| Auth | Better Auth — email/password, session management, KYC/AML hooks |
 | Blockchain | Solana — Anchor 0.32 framework (Rust) |
+| Wallet | Phantom (via `@solana/wallet-adapter-react`) |
 | Oracle | Custom off-chain adapter — NOAA SWPC + Kyoto WDC data feeds |
 | Price Feeds | Chainlink Data Feeds SDK v2 (direct Solana account reads) |
-| Database | MySQL |
+| Database | MySQL 8 |
 | Tokens | USDC (stablecoin), SSTM (platform token), SOL (gas), LINK (oracle gas) |
 
 ---
@@ -62,9 +64,23 @@ Contracts can be written against any of the following indices:
 
 ---
 
+## Authentication & Access
+
+The site is publicly browsable. Full trading access requires completing three steps in sequence:
+
+| Step | Requirement | Unlocks |
+|---|---|---|
+| 1 | Register / Login (Better Auth) | Profile, notifications, order history |
+| 2 | KYC / AML verification (third-party) | Connect Wallet button |
+| 3 | Connect Phantom wallet | Create and manage orders |
+
+See `website/CLAUDE.md` for full auth flow documentation.
+
+---
+
 ## Development Setup
 
-Each component has its own setup guide in its subdirectory `CLAUDE.md`. See also `DEPLOYMENT.md` at the repo root for the full AWS deployment architecture and GitHub Actions CI/CD reference.
+Each component has its own setup guide in its subdirectory `CLAUDE.md`.
 
 ### Prerequisites
 
@@ -75,12 +91,16 @@ Each component has its own setup guide in its subdirectory `CLAUDE.md`. See also
 | Solana / Agave CLI | 3.1.11 | Smart contracts |
 | Anchor CLI | 0.32.1 | Smart contracts |
 | MySQL | 8.x | Website, Oracle |
+| Phantom | latest | Testing wallet flows |
 
 > Smart contract development requires WSL2 (Ubuntu 22.04) on Windows.
 
 ### Quick Start
 
 ```bash
+# Website
+cd website && npm install && npm run dev
+
 # Oracle
 cd oracle && npm install && cp .env.example .env
 # fill in .env, then:
@@ -88,9 +108,30 @@ npm start
 
 # Smart contracts (WSL2)
 cd smartcontracts && anchor build && anchor test
+```
 
-# Website
-cd website && npm install && npm run dev
+### Website Environment Variables
+
+Create `website/.env.local`:
+
+```env
+# MySQL
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=<password>
+DB_NAME=condition_cover
+
+# Better Auth
+BETTER_AUTH_SECRET=<random 32+ byte secret>
+BETTER_AUTH_URL=http://localhost:3000
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
+```
+
+After changing `website/lib/auth.ts`, re-run the Better Auth migration:
+
+```bash
+cd website && echo "y" | npx @better-auth/cli migrate --config lib/auth.ts
 ```
 
 ---
