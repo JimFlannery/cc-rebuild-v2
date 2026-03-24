@@ -13,7 +13,7 @@ export const auth = betterAuth({
       // Set to true by a KYC/AML verification webhook once the user passes
       kycVerified: {
         type: "boolean",
-        defaultValue: false,
+        defaultValue: true, // TODO: set back to false when KYC service is live (pre-launch)
         input: false, // not settable by the user directly
       },
       // Populated when the user connects their Phantom wallet

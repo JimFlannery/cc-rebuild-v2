@@ -1,7 +1,7 @@
-export default function MyContractsPage() {
+export default function LoopingPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center">
-      <h1 className="text-2xl font-semibold">My Contracts</h1>
+      <h1 className="text-2xl font-semibold">Yield Boost</h1>
     </main>
   );
 }

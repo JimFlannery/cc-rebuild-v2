@@ -1,7 +1,7 @@
-export default function LoopingPage() {
+export default function OrdersPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center">
-      <h1 className="text-2xl font-semibold">Looping</h1>
+      <h1 className="text-2xl font-semibold">Markets</h1>
     </main>
   );
 }
