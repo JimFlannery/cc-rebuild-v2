@@ -84,15 +84,10 @@ Only this wallet may sign the `settle` instruction. Any other signer is rejected
 
 | Instruction | Signer | Status |
 |---|---|---|
-| `settle` | Oracle wallet | ✓ Implemented — records outcome on Contract account; token transfers TODO |
-
-### Planned
-
-| Instruction | Signer | Description |
-|---|---|---|
-| `create_order` | Order owner | Creates a Hedge or Cover order; locks collateral (USDC or SSTM) into a PDA escrow |
-| `match_order` | Matcher (any) | Pairs a Hedge order with a Cover order; creates a live `Contract` account |
-| `cancel_order` | Order owner | Cancels an unfilled order; releases escrowed tokens back to the user |
+| `create_order` | Order owner | ✓ Creates a Hedge or Cover order; locks collateral into a PDA escrow |
+| `match_order` | Matcher (any) | ✓ Pairs a Hedge+Cover order; transfers premium to cover party; coverage → contract escrow |
+| `cancel_order` | Order owner | ✓ Cancels an Open order; returns escrowed collateral; closes Order + escrow accounts |
+| `settle` | Oracle wallet | ✓ Records outcome; transfers contract escrow to winner's token account |
 
 ---
 
@@ -114,7 +109,7 @@ Stores the on-chain state for a matched contract. Created by `match_order`; sett
 
 Account size: `Contract::LEN` = 149 bytes.
 
-### `Order` — `src/state/order.rs` (planned)
+### `Order` — `src/state/order.rs` ✓
 
 Will mirror the MySQL `Orders` table key fields:
 
@@ -241,13 +236,47 @@ The MySQL `Orders` and `Contracts` tables mirror on-chain state for the website 
 ## To Do (implementation sequence)
 
 1. ~~Hardcode `ORACLE_AUTHORITY` in `constants.rs`~~ ✓
-2. ~~Implement `settle` instruction~~ ✓ (outcome recorded on-chain; token transfers pending)
-3. Implement `create_order` — PDA escrow, SPL token lock (requires adding `anchor-spl`)
-4. Implement `match_order` — pair orders, create `Contract` account
-5. Implement `cancel_order` — release escrowed tokens
-6. Add SPL token transfers to `settle` — move collateral to winner's token account
-7. Write integration tests (`tests/condition_cover.ts`)
-8. Deploy to devnet and run oracle end-to-end
+2. ~~Implement `settle` instruction~~ ✓
+3. ~~Implement `create_order` — PDA escrow, SPL token lock~~ ✓
+4. ~~Implement `match_order` — pair orders, create `Contract` account~~ ✓
+5. ~~Implement `cancel_order` — release escrowed tokens~~ ✓
+6. ~~Add SPL token transfers to `settle`~~ ✓
+7. ~~Write integration tests (`tests/condition_cover.ts`)~~ ✓
+8. ~~All 8 integration tests passing on localnet~~ ✓
+9. Deploy to devnet and run oracle end-to-end
+
+---
+
+## Integration Tests — `tests/condition_cover.ts`
+
+All 8 tests pass on localnet (`anchor test`). Last verified: 2026-03-28.
+
+### Test environment
+
+- Local validator (Anchor default)
+- Test mint stands in for USDC (6 decimals, minted by test payer)
+- Hedge wallet and Cover wallet each funded with 10 test-USDC and 2 SOL
+- Oracle keypair loaded from `~/.config/solana/oracle-keypair.json` (must match `ORACLE_AUTHORITY`); airdropped 2 SOL for signing fees
+
+### Test cases
+
+| # | Suite | Test | What it verifies |
+|---|---|---|---|
+| 1 | `create_order` | Hedge order creation | Order PDA created; `hedge_premium` locked in escrow; `order_type = Hedge`, `status = Open` |
+| 2 | `create_order` | Cover order creation | Order PDA created; `coverage` locked in escrow; `order_type = Cover`, `status = Open` |
+| 3 | `match_order` | Hedge + Cover matched | Contract PDA created; premium transferred to cover wallet; coverage moved to contract escrow; both orders marked `Matched` |
+| 4 | `settle` | outcome = 1 (hedge wins) | Contract escrow transferred to hedge token account; `contract.outcome = 1` |
+| 5 | `settle` | outcome = 0 (cover wins) | Contract escrow transferred to cover token account; `contract.outcome = 0` |
+| 6 | `settle` | Double-settle rejected | Second settle on already-settled contract throws `AlreadySettled` (6001) |
+| 7 | `cancel_order` | Open order cancelled | Escrowed collateral returned to owner; Order account closed (rent reclaimed) |
+| 8 | `cancel_order` | Non-owner cancel rejected | Cancel by wrong signer throws `Unauthorized` (6007) |
+
+### Key assertions
+
+- **Token balances** verified via `getAccount` before/after each transfer
+- **Account state** (status, outcome) verified by fetching the on-chain account after each instruction
+- **PDA closure** verified by checking `getAccountInfo` returns `null` after `cancel_order`
+- **Error codes** verified by checking `err.message` includes the named error constant
 
 ---
 

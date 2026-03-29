@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts -maxdepth 3 -not -path */node_modules/* -not -path */.anchor/* -not -path */target/*)",
+      "Bash(find \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new\" -type f -name \"*\")",
+      "Bash(wc -l \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new/page.tsx\")",
+      "Bash(wc -l \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new/[id]/page.tsx\")"
+    ]
+  }
+}

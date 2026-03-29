@@ -21,12 +21,19 @@ pub struct Contract {
     /// Some(1) = hedge party wins (index threshold was crossed).
     /// Some(0) = cover party wins (contract expired without threshold crossing).
     pub outcome: Option<u8>,
-    /// PDA bump seed — stored so the program can sign for the PDA in CPIs.
+    /// PDA bump seed for the Contract account — used to sign CPIs from this PDA.
     pub bump: u8,
+    /// PDA bump for the contract escrow token account (seeds: [b"contract_escrow", contract]).
+    /// Stored so `settle` can reconstruct the escrow signer without extra accounts.
+    pub escrow_bump: u8,
 }
 
 impl Contract {
-    /// Account size for `init` space calculation.
+    /// Account size including the 8-byte Anchor discriminator.
+    ///
+    /// Note: 11 bytes are reserved here for the future optimistic oracle fields
+    /// (proposed_outcome: Option<u8> = 2, dispute_deadline: i64 = 8, disputed: bool = 1).
+    /// Do not use those bytes until the optimistic oracle is implemented post-devnet.
     pub const LEN: usize = 8    // Anchor discriminator
         + 32   // hedge_order
         + 32   // cover_order
@@ -34,5 +41,8 @@ impl Contract {
         + 32   // cover_token_account
         + 8    // expiration (i64)
         + 2    // outcome (Option<u8>: 1-byte tag + 1-byte value)
-        + 1;   // bump
+        + 1    // bump
+        + 1    // escrow_bump
+        + 11;  // reserved for optimistic oracle fields (post-devnet)
+               // Total: 159 bytes
 }

@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { label: "Markets", href: "/markets" },
   { label: "Dashboards", href: "/dashboards" },
   { label: "Yield Boost", href: "/yieldboost" },
+  { label: "Hedge", href: "/hedge" },
   { label: "Learn", href: "/learn" },
   { label: "Rewards", href: "/rewards" },
   { label: "Resources", href: "/resources" },

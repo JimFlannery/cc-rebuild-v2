@@ -86,7 +86,7 @@ Color coding:
 - SSTM Reward APY: full looping tier rate (e.g. 10%)
 - Options: Offset Risk checkbox, Offset Yield Boost checkbox ("Up to 8%")
 - Countdown timer: shown
-- Purpose: creates (or matches) both a Cover order and a Hedge order with identical parameters in one action, resulting in a delta-neutral position with zero net risk; qualifies user for full looping APY tier rewards. Routes to `/looping` after completion.
+- Purpose: creates (or matches) both a Cover order and a Hedge order with identical parameters in one action, resulting in a delta-neutral position with zero net risk; qualifies user for full looping APY tier rewards. Looping management handled within `/yieldboost`.
 
 **Card 5 — Free Form Hedge**
 - Type: Seeking Cover (Hedge order)
@@ -121,17 +121,10 @@ These routes exist in the prototype at `C:\Users\jim-f\source\repos\next-js` and
 
 | Route | Purpose | Notes |
 |---|---|---|
-| `/looping` | On-platform loans for users with offset orders | See full description below |
 | `/notifications` | User alerts for contract events, settlement, order matching | Replaces prototype stub |
 | `/profile` | User profile, wallet connection, account settings | Must integrate Solana wallet (replaces Cognito profile) |
 
-#### `/looping` — Offset Order Loans
-Looping is a feature for users who have **offset their orders**: they hold both a Cover order and a Hedge order with identical parameters on the same index event. Because the two positions cancel each other out (any payout from one offsets the loss on the other), the user carries no net risk. This capital-neutral position qualifies them for an on-platform loan against the locked collateral.
-
-Key considerations:
-- Identify offset order pairs from the `Orders` table (`OffsettingID`, `OffsettingTaken` fields).
-- Loan terms, eligibility, and repayment logic TBD.
-- Distinct from the MOS (Multi-Order System) — MOS is about partial fills across multiple counterparties; looping is about a single user holding both sides.
+> **Note:** Looping/offset order functionality has been merged into `/yieldboost`. There is no separate `/looping` route.
 
 ---
 
@@ -198,7 +191,6 @@ website/
 │   ├── feedback/
 │   ├── invite/
 │   ├── learn/
-│   ├── looping/
 │   ├── notifications/
 │   ├── orders/
 │   ├── profile/

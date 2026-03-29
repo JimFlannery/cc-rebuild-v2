@@ -34,15 +34,21 @@ import type { ActiveContract } from './db/contracts';
 /**
  * Returns true if the current reading crosses the contract's IndexLevel.
  *
+ * The on-chain program stores `index_level` as a fixed-point integer ×100
+ * (e.g. Kp 5.0 → 500, Dst -120 nT → -12000).  MySQL mirrors this value.
+ * NOAA adapters return natural float values (5.0, -120.0), so we decode
+ * the stored threshold by dividing by 100 before comparing.
+ *
  * Direction of comparison:
  *   Kp, X-Ray, Proton, F10.7 → value >= threshold  (storm is above threshold)
  *   Dst                       → value <= threshold  (storm is more negative than threshold)
  */
 function isThresholdCrossed(contract: ActiveContract, reading: IndexReading): boolean {
+  const threshold = contract.indexLevel / 100; // decode fixed-point ×100
   if (reading.indexName === 'Dst') {
-    return reading.value <= contract.indexLevel;
+    return reading.value <= threshold;
   }
-  return reading.value >= contract.indexLevel;
+  return reading.value >= threshold;
 }
 
 // ─── Per-contract settlement ──────────────────────────────────────────────────

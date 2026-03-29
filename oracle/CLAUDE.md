@@ -72,6 +72,33 @@ To switch Kp to production: update `fetchKp.ts` endpoint and parse `estimated_kp
 | Solar Radio Flux | `flux >= IndexLevel` | sfu |
 | Dst | `value <= IndexLevel` | Storms are *more negative* than threshold (e.g. -100 nT) |
 
+### Fixed-Point Encoding
+
+The on-chain program stores `index_level` as a **fixed-point integer ×100** (`i64`):
+
+| Human value | On-chain / MySQL `IndexLevel` |
+|---|---|
+| Kp 5.0 | `500` |
+| Kp 7.33 | `733` |
+| Dst -120 nT | `-12000` |
+| Dst -50 nT | `-5000` |
+
+NOAA adapters return natural floats (`5.0`, `-120.0`). `isThresholdCrossed` in `index.ts` divides the stored threshold by 100 before comparing. Adapters do **not** need to scale their values.
+
+MySQL `IndexLevel` stores the same ×100 integer as the on-chain program. The website must encode `IndexLevel` as ×100 when creating orders.
+
+### Index Name Mapping
+
+MySQL and the oracle use human-readable strings. The on-chain Anchor program uses enum variants. The canonical mapping lives in `src/adapter/types.ts` (`INDEX_NAME_TO_ANCHOR`):
+
+| MySQL / Oracle string | Anchor enum argument |
+|---|---|
+| `'Kp'` | `{ kp: {} }` |
+| `'Dst'` | `{ dst: {} }` |
+| `'Solar X-Ray Flux'` | `{ solarXRayFlux: {} }` |
+| `'Solar Proton Flux'` | `{ solarProtonFlux: {} }` |
+| `'Solar Radio Flux'` | `{ solarRadioFlux: {} }` |
+
 ---
 
 ## Settlement Logic
@@ -158,10 +185,13 @@ oracle/
 
 1. ~~Hardcode `ORACLE_AUTHORITY` in `smartcontracts/`~~ ✓
 2. ~~Implement `settle` instruction (on-chain)~~ ✓
-3. Implement `create_order` and `match_order` instructions (on-chain) — needed to create `Contract` accounts that `settle` operates on.
-4. Add SPL token escrow to `settle` — transfer collateral to winner's token account.
-5. Wire up MySQL `Status` field updates after each on-chain event.
-6. Write integration tests (`smartcontracts/tests/condition_cover.ts`).
+3. ~~Implement `create_order`, `match_order`, `cancel_order` instructions (on-chain)~~ ✓
+4. ~~Add SPL token escrow to `settle` — transfer collateral to winner's token account~~ ✓
+5. ~~Wire up MySQL `Status` field updates after settlement (`recordSettlement`)~~ ✓
+6. ~~Write integration tests (`smartcontracts/tests/condition_cover.ts`) — 8/8 passing~~ ✓
+7. ~~Fix `isThresholdCrossed` to decode fixed-point ×100 index levels~~ ✓
+8. ~~Fix `settle.ts` IDL and accounts — add `contractEscrow`, `winnerTokenAccount`, `tokenProgram`~~ ✓
+9. Deploy to devnet and run oracle end-to-end
 
 ---
 
