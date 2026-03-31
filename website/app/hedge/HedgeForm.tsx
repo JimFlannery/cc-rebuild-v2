@@ -298,9 +298,6 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
                       className="accent-primary"
                     />
                     {c}
-                    <span className="text-muted-foreground text-xs">
-                      ${c === "USDC" ? prices.USDC.toFixed(4) : prices.SSTM.toFixed(4)}
-                    </span>
                   </label>
                 ))}
               </div>
@@ -476,14 +473,9 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
               <SummaryRow
                 label="Premium to Pay"
                 value={
-                  adjustedPremium > 0 && currency
-                    ? `${adjustedPremium.toFixed(4)} ${currency}`
-                    : "—"
-                }
-                sub={
                   adjustedPremium > 0 && tokenPrice > 0
-                    ? `$${(adjustedPremium * tokenPrice).toFixed(2)}`
-                    : undefined
+                    ? `$${(adjustedPremium * tokenPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—"
                 }
               />
               <SummaryRow label="Contract Duration" value={durationNum > 0 ? `${durationNum} days` : "—"} />
@@ -505,11 +497,10 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
             </button>
 
             {showDetails && (
-              <div className="space-y-1.5 text-xs border-t border-border pt-3">
+              <div className="space-y-1.5 text-sm border-t border-border pt-3">
                 <SummaryRow
-                  label="Annual Payout Odds"
-                  value={annualOdds > 0 ? `${(annualOdds * 100).toFixed(4)}%` : "—"}
-                  valueClass="text-red-500"
+                  label={`${currency || "Token"} Current Value`}
+                  value={tokenPrice > 0 ? `$${tokenPrice.toFixed(4)}` : "—"}
                   small
                 />
                 <SummaryRow
@@ -679,7 +670,7 @@ function SummaryRow({
   small?: boolean;
 }) {
   return (
-    <div className={cn("flex justify-between gap-2", small ? "text-xs" : "text-sm")}>
+    <div className={cn("flex justify-between gap-2", small ? "text-sm" : "text-sm")}>
       <span className="text-muted-foreground shrink-0">{label}</span>
       <span className={cn("text-right", bold && "font-semibold", valueClass)}>
         {value}

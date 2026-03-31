@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { WalletProvider } from "@/components/wallet-provider";
 import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
+import { getMarketMetrics } from "@/app/_actions/getDashboardMetrics";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,11 +22,13 @@ export const metadata: Metadata = {
   description: "Space-weather risk hedging platform",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const metrics = await getMarketMetrics().catch(() => null);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -33,7 +36,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <WalletProvider>
-            <Nav />
+            <Nav coverSupply={metrics?.coverSupply ?? 0} coverDemand={metrics?.coverDemand ?? 0} />
             <div className="flex-1">{children}</div>
             <Footer />
           </WalletProvider>

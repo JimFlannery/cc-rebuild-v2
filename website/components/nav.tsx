@@ -16,11 +16,11 @@ const SUPPORTED_WALLETS = [
 
 const NAV_LINKS = [
   { label: "Markets", href: "/markets" },
-  { label: "Dashboards", href: "/dashboards" },
-  { label: "Yield Boost", href: "/yieldboost" },
-  { label: "Hedge", href: "/hedge" },
   { label: "Learn-to-Earn", href: "/learn" },
   { label: "Rewards", href: "/rewards" },
+  { label: "Yield Boost", href: "/yieldboost" },
+  { label: "Hedge", href: "/hedge" },
+  { label: "Dashboards", href: "/dashboards" },
 ];
 
 const USER_MENU = [
@@ -30,7 +30,14 @@ const USER_MENU = [
   { label: "My Contracts", href: "/contracts" },
 ];
 
-export function Nav() {
+function formatShort(n: number): string {
+  const v = Number(n);
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
+export function Nav({ coverSupply = 0, coverDemand = 0 }: { coverSupply?: number; coverDemand?: number }) {
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -86,10 +93,10 @@ export function Nav() {
     <header className="sticky top-0 z-50 w-full border-b border-gray-300 dark:border-white/20 bg-background/95 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl w-full">
 
-      {/* Row 1: Logo + tagline + actions */}
-      <div className="relative flex flex-col sm:flex-row sm:h-12 items-center gap-2 px-4 py-2 sm:py-0">
+      {/* Row 1: Logo | Tagline | Metrics | Actions */}
+      <div className="flex flex-col sm:flex-row sm:h-12 items-center justify-between px-4 py-2 sm:py-0">
 
-        {/* Logo */}
+        {/* ConditionCover — flush left */}
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight text-foreground"
@@ -98,13 +105,23 @@ export function Nav() {
           <span className="text-xl">ConditionCover</span>
         </Link>
 
-        {/* Tagline — hidden when too narrow */}
-        <span className="hidden md:block absolute left-1/2 -translate-x-1/2 text-base font-bold text-foreground tracking-wide pointer-events-none">
+        {/* Tagline */}
+        <span className="hidden md:block text-base text-blue-600 dark:text-blue-400 tracking-wide whitespace-nowrap">
           Tokenized Environmental Cover Markets
         </span>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2 sm:ml-auto">
+        {/* Market metrics */}
+        <div className="hidden lg:flex items-center gap-4 text-sm whitespace-nowrap">
+          <span className="text-green-600 dark:text-green-400">
+            Cover Supplied: {formatShort(coverSupply)}
+          </span>
+          <span className="text-muted-foreground">
+            Cover Demand: <span className="text-foreground">{formatShort(coverDemand)}</span>
+          </span>
+        </div>
+
+        {/* Right side — flush right */}
+        <div className="flex items-center gap-2">
           <ThemeToggle />
 
           {isLoggedIn ? (
@@ -173,7 +190,7 @@ export function Nav() {
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen((v) => !v)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-base font-semibold hover:opacity-90 transition-opacity"
                   aria-label="User menu"
                   aria-expanded={userMenuOpen}
                 >
