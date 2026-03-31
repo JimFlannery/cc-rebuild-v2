@@ -4,7 +4,13 @@
       "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts -maxdepth 3 -not -path */node_modules/* -not -path */.anchor/* -not -path */target/*)",
       "Bash(find \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new\" -type f -name \"*\")",
       "Bash(wc -l \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new/page.tsx\")",
-      "Bash(wc -l \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new/[id]/page.tsx\")"
+      "Bash(wc -l \"c:/Users/jim-f/source/repos/next-js/app/\\(navbars\\)/orders/new/[id]/page.tsx\")",
+      "Read(//c/Users/jim-f/source/repos/cc-rebuild-v2/**)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i 's/className=\"\"flex min-h-screen flex-col items-center justify-center\\\\\\( gap-[0-9]*\\\\\\)\\\\?\"\"/className=\"\"mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-8\"\"/g' \"$f\")",
+      "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2 -name schema.sql -o -name *schema* -type f)",
+      "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts/target -name *.json -path */idl/* -o -name *.json -path */types/*)"
     ]
   }
 }

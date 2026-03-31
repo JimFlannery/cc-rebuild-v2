@@ -6,21 +6,21 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useSession, signOut } from "@/lib/auth-client";
-import { Tooltip } from "@/components/tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LoginModal } from "@/components/login-modal";
 import { cn } from "@/lib/utils";
+
+const SUPPORTED_WALLETS = [
+  { name: "Phantom", icon: "/Phantom_SVG_Icon.svg" },
+];
 
 const NAV_LINKS = [
   { label: "Markets", href: "/markets" },
   { label: "Dashboards", href: "/dashboards" },
   { label: "Yield Boost", href: "/yieldboost" },
   { label: "Hedge", href: "/hedge" },
-  { label: "Learn", href: "/learn" },
+  { label: "Learn-to-Earn", href: "/learn" },
   { label: "Rewards", href: "/rewards" },
-  { label: "Resources", href: "/resources" },
-
-  { label: "Feedback", href: "/feedback" },
 ];
 
 const USER_MENU = [
@@ -39,10 +39,11 @@ export function Nav() {
   const { data: session } = useSession();
   const { connected, connecting, publicKey, connect, disconnect, select, wallet } = useWallet();
   const [connectPending, setConnectPending] = useState(false);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const walletMenuRef = useRef<HTMLDivElement>(null);
 
   // Derived auth state
   const isLoggedIn = !!session;
-  const kycVerified = session?.user?.kycVerified ?? false;
 
   // After select('Phantom') sets the wallet in state, trigger connect()
   useEffect(() => {
@@ -61,11 +62,14 @@ export function Nav() {
     }
   }
 
-  // Close user dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
+      }
+      if (walletMenuRef.current && !walletMenuRef.current.contains(e.target as Node)) {
+        setWalletMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -79,7 +83,8 @@ export function Nav() {
 
   return (
     <>
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-300 dark:border-white/20 bg-background/95 backdrop-blur-sm">
+      <div className="mx-auto max-w-7xl w-full">
 
       {/* Row 1: Logo + tagline + actions */}
       <div className="relative flex flex-col sm:flex-row sm:h-12 items-center gap-2 px-4 py-2 sm:py-0">
@@ -105,36 +110,64 @@ export function Nav() {
           {isLoggedIn ? (
             <>
               {/* State 3 & 4: wallet button — only shown when logged in */}
-              {connected ? (
-                // State 4: wallet connected — show truncated address
-                <button
-                  onClick={() => disconnect()}
-                  className="rounded-md border border-border px-4 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-                >
-                  {publicKey
-                    ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
-                    : "Wallet"}
-                </button>
-              ) : kycVerified ? (
-                // State 3: KYC done, wallet not connected — active Connect Wallet
-                <button
-                  onClick={handleConnectWallet}
-                  disabled={connecting}
-                  className="rounded-md border border-border px-4 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-                >
-                  {connecting ? "Connecting…" : "Connect Wallet"}
-                </button>
-              ) : (
-                // State 2: logged in but KYC not verified — disabled with tooltip
-                <Tooltip content="Complete identity verification to connect a wallet">
+              <div className="relative" ref={walletMenuRef}>
+                {connected ? (
+                  // Connected — show address button that opens disconnect menu
                   <button
-                    disabled
-                    className="rounded-md border border-border px-4 py-1.5 text-sm font-medium text-foreground opacity-40 cursor-not-allowed"
+                    onClick={() => setWalletMenuOpen((v) => !v)}
+                    className="rounded-md border border-border px-4 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors flex items-center gap-2"
                   >
-                    Connect Wallet
+                    <Image src="/Phantom_SVG_Icon.svg" alt="Phantom" width={16} height={16} />
+                    {publicKey
+                      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
+                      : "Wallet"}
                   </button>
-                </Tooltip>
-              )}
+                ) : (
+                  // Not connected — open wallet selection menu
+                  <button
+                    onClick={() => setWalletMenuOpen((v) => !v)}
+                    disabled={connecting}
+                    className="rounded-md border border-border px-4 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                  >
+                    {connecting ? "Connecting…" : "Connect Wallet"}
+                  </button>
+                )}
+
+                {walletMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-popover py-1 shadow-lg z-50">
+                    {!connected && (
+                      <>
+                        <p className="px-4 py-1.5 text-xs text-muted-foreground">Select wallet</p>
+                        {SUPPORTED_WALLETS.map((w) => (
+                          <button
+                            key={w.name}
+                            onClick={() => {
+                              setWalletMenuOpen(false);
+                              handleConnectWallet();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
+                            <Image src={w.icon} alt={w.name} width={20} height={20} />
+                            {w.name}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {connected && (
+                      <button
+                        onClick={() => {
+                          setWalletMenuOpen(false);
+                          disconnect();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        <span className="w-5 h-5 flex items-center justify-center text-muted-foreground">✕</span>
+                        Disconnect
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Profile dropdown (all logged-in states) */}
               <div className="relative" ref={userMenuRef}>
@@ -192,7 +225,7 @@ export function Nav() {
             key={link.href}
             href={link.href}
             className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap",
+              "shrink-0 rounded-md px-3 py-1.5 text-md font-medium transition-colors whitespace-nowrap",
               pathname === link.href
                 ? "text-foreground font-semibold"
                 : "text-muted-foreground hover:text-foreground"
@@ -203,6 +236,7 @@ export function Nav() {
         ))}
       </nav>
 
+      </div>
     </header>
     {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
     </>

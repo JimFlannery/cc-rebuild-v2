@@ -130,10 +130,22 @@ Tier boundaries and fee rates are read from the MySQL **`Tiers`** table at page 
 
 Fetch via `app/_actions/getTiers.ts` and pass to the client component as a prop. Cache the result for the session (tiers change infrequently).
 
-The tier is determined by matching `coverage` against the coverage range columns in `Tiers`. The applicable fee percentage is the SSTM or USDC fee column depending on the selected denomination.
+**`Tiers` column reference:**
+
+| Column | Type | Description |
+|---|---|---|
+| `Tier` | INT | Tier number (1–5) |
+| `Name` | VARCHAR | Display name |
+| `TotalStart` | INT | Lower bound of coverage range (inclusive) |
+| `TotalLessThan` | INT | Upper bound of coverage range (exclusive); NULL = no upper limit |
+| `APY` | DECIMAL(10,6) | Cover party reward APY (not used on Hedge page — for reference only) |
+| `USDCserviceFee` | DECIMAL(10,6) | Service fee rate when denomination = USDC |
+| `SSTMserviceFee` | DECIMAL(10,6) | Service fee rate when denomination = SSTM |
+
+The matching tier is the row where `TotalStart <= coverage < TotalLessThan` (or `TotalStart <= coverage` when `TotalLessThan` is NULL).
 
 ```
-contractServiceFee = adjustedHedgePremium × tier_fee_pct
+contractServiceFee = adjustedHedgePremium × (USDCserviceFee or SSTMserviceFee)
 ```
 
 ### Gas Fees
@@ -243,30 +255,37 @@ export const TOKEN_PRICES = {
 
 ## MySQL Write (after on-chain success)
 
-Write to `Orders` table:
-```
-OrderType         = 'Hedge'
-Status            = 'Open'
-OrderTiming       = 'Market' | 'Committed'
-OrderDuration     = null | days
-Expiration        = ISO timestamp | null
-Denomination      = 'SSTM' | 'USDC'
-Duration          = days
-OracleChecks      = 1   (fixed — no additional oracle checks option)
-IndexName         = 'Dst' | 'Kp'
-IndexLevel        = threshold value (human-readable, e.g. -400)
-PayoutProbability = calculated decimal
-Coverage          = dollar amount
-HedgePremium      = base premium
-AdjustedHedgePremium = premium after adjustment
-HedgePremiumAdjustment = multiplier
-GasFeeLayer1      = SOL amount
-ServiceFee        = fee amount
-WalletAddress     = connected wallet pubkey
-OrderAddress      = on-chain Order PDA pubkey
-DenominationAddress = token mint address
-MOS               = 0  (always — no risk sharing)
-```
+Write to `Orders` table using exact column names from `schema.sql`:
+
+| Column | Value |
+|---|---|
+| `OrderType` | `'Hedge'` |
+| `Status` | `'Open'` |
+| `StatusDate` | ISO timestamp of submission |
+| `OrderTiming` | `'Market'` or `'Committed'` |
+| `OrderDuration` | NULL (Market) or days integer (Committed) |
+| `Expiration` | NULL (Market) or ISO timestamp (Committed) |
+| `FormattedExpiration` | NULL (Market) or `'DD Mon YYYY 11:59 PM'` (Committed) |
+| `Denomination` | `'SSTM'` or `'USDC'` |
+| `Duration` | contract duration in days |
+| `OracleChecks` | `1` (fixed — no additional oracle checks) |
+| `IndexName` | `'Disturbance Storm Time'` or `'Planetary K-Index'` |
+| `IndexLevel` | human-readable threshold (e.g. `-400`, `6`) |
+| `IndexUnit` | `'nT'` (Dst) or `'Kp'` (Kp) |
+| `PayoutProbability` | calculated decimal |
+| `Coverage` | dollar amount |
+| `HedgePremium` | base premium (pre-adjustment) |
+| `HedgePremiumAdjustment` | multiplier (default `1`) |
+| `AdjustedHedgePremium` | premium after adjustment |
+| `ServiceFee` | service fee amount |
+| `TotalServiceFees` | total of all fees |
+| `GasFeeLayer1` | SOL amount (Layer 1 gas) |
+| `GasFeeOracle` | `0` (no oracle checks surcharge) |
+| `WalletAddress` | connected wallet pubkey (Solana base58) |
+| `OrderAddress` | on-chain Order PDA pubkey |
+| `DenominationAddress` | token mint address |
+| `MOS` | `0` (always — no risk sharing) |
+| `MOStype` | NULL |
 
 ---
 

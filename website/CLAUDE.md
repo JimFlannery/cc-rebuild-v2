@@ -5,18 +5,51 @@
 - **Next.js 16.1.6** (App Router)
 - **React 19**
 - **TypeScript 5** (strict mode)
-- **Tailwind CSS 4** (via `@tailwindcss/postcss`)
+- **Tailwind CSS v4** (via `@tailwindcss/postcss`)
 - **ESLint 9** (`eslint-config-next`)
+- **Better Auth** — email/password auth, MySQL adapter
+- **@coral-xyz/anchor** — Anchor program client for browser on-chain calls
+- **@solana/wallet-adapter-react** — Phantom wallet integration
+- **@solana/spl-token** — ATA derivation
 - Path alias: `@/*` → project root
 
-No UI component library has been added yet (prototype used Radix UI — to be decided).
-No `components/` or `lib/` directories exist yet.
+No Radix UI / shadcn component library installed. UI is hand-built with Tailwind.
 
 ---
 
 ## Navigation & Layout
 
 The prototype used a **side navigation menu**. This has been replaced with a **top navigation bar** — there is no sidebar in the rebuild. All routes are accessed from the top nav.
+
+### Width convention
+All pages and the navbar inner content use **`max-w-7xl`** (1280 px) centered with `mx-auto`.
+Standard page `<main>` class: `mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-8`.
+
+### Root layout (`app/layout.tsx`)
+`ThemeProvider → WalletProvider → Nav → <div flex-1>{children}</div> → Footer`
+Body: `flex flex-col min-h-screen` so Footer always sits at the bottom.
+
+### Navbar (`components/nav.tsx`)
+Two rows inside a `max-w-7xl` inner wrapper (header background stays full-width):
+- Row 1: Logo · centered tagline (md+) · ThemeToggle · **wallet dropdown** · user menu / Login
+- Row 2: Scrollable nav links
+
+**Nav links (current):** Markets · Dashboards · Yield Boost · Hedge · Learn-to-Earn (`/learn`) · Rewards
+**Removed from nav, now in footer:** Resources · Feedback · Invite Friends · Legal Disclaimer
+
+**Wallet dropdown** (`SUPPORTED_WALLETS` array at top of nav.tsx):
+- Not connected → "Connect Wallet" opens dropdown listing wallets with icons. Only Phantom supported now.
+- Connected → shows Phantom icon + truncated address (4…4); dropdown offers Disconnect.
+- Phantom icon: `/public/Phantom_SVG_Icon.svg`
+- Adding more wallets: append to `SUPPORTED_WALLETS`.
+- **KYC gate removed for development.** The original State 2 (disabled button + tooltip) is bypassed until the KYC service is live. See Access States section below for the intended pre-launch flow.
+
+**Navbar border:** `border-gray-300 dark:border-white/20` (overrides `border-border` for better visibility).
+
+### Footer (`components/footer.tsx`)
+Full-width `bg-gray-200 / dark:bg-slate-800` band, content constrained to `max-w-7xl`.
+Links: Invite Friends · Resources · Feedback · Legal Disclaimer
+Copyright: `© 2026 Frontier Stream, Inc. All Rights Reserved. Patent Pending.`
 
 ---
 
@@ -99,6 +132,96 @@ Color coding:
 - No countdown timer, no offset checkboxes
 - Background color: green/yellow (visually distinct from cover cards)
 - Purpose: free-form hedge entry; user specifies dollar amount and system calculates cost and trigger
+
+---
+
+## Pages — Current Status
+
+| Route | Status | Notes |
+|---|---|---|
+| `/` | Stub | Shows MySQL connection status |
+| `/markets` | Stub | |
+| `/dashboards` | **Built** | See Dashboards section below |
+| `/yieldboost` | Stub | |
+| `/hedge` | **Built** | Full order creation; see Hedge section below |
+| `/learn` | Stub | Nav label is "Learn-to-Earn"; path stays `/learn` |
+| `/rewards` | **Built** | Token Rewards content from prototype (no Points, no images) |
+| `/resources` | Stub | Link moved to footer |
+| `/feedback` | Stub | Link moved to footer |
+| `/profile` | Stub | |
+| `/notifications` | Stub | |
+| `/orders` | Stub | |
+| `/contracts` | Stub | |
+| `/invite` | Stub | Link in footer |
+| `/legal` | **Built** | Full disclaimer from prototype sidebar popup |
+
+---
+
+## Built Pages — Detail
+
+### `/hedge` — Hedge Order Creation
+
+Spec: `app/hedge/CLAUDE.md`
+
+**Files:**
+- `app/hedge/page.tsx` — Server component; fetches tiers + prices, renders `HedgeForm`.
+- `app/hedge/HedgeForm.tsx` — Client component; full form, calculations, on-chain submit, MySQL write.
+
+**Layout:** `[5fr_3fr]` two-column on desktop (left = form, right = sticky summary); single column mobile.
+
+**On-chain:** Calls `create_order` on `condition_cover` Anchor program (devnet).
+- Order PDA seeds: `["order", owner, nonce_le8]`
+- Escrow PDA seeds: `["escrow", order_pda]`
+- Uses `useAnchorWallet()` + `AnchorProvider` from `@coral-xyz/anchor`
+- IDL at `lib/idl/condition_cover.json` — keep in sync with `smartcontracts/target/idl/`
+
+**Post on-chain:** Writes to MySQL `Orders` via `createHedgeOrder` server action.
+
+**SSTM mint placeholder:** `lib/orderConstants.ts` `MINT_ADDRESSES.SSTM` — replace before devnet SSTM testing.
+
+### `/dashboards` — Platform & Risk Dashboards
+
+**Files:**
+- `app/dashboards/page.tsx` — Server component; fetches market metrics, renders all sections.
+- `app/dashboards/RiskManagement.tsx` — Client component; fetches user stats by wallet on connect.
+
+**Three sections on one page (no tabs):**
+1. **Market Metrics** — Cover Supply/Demand, Premiums Earned, Cover Secured, TVL (SSTM + USDC). Single aggregate SQL query. Coverage stored as USD — no token price conversion.
+2. **Space Weather** — Kp Forecast, Mid/High-Latitude storm probability grids, Dst card. All values `—` pending MCP integration. Educational tooltips present.
+3. **Risk Management** — My Cover Supplied, Offsetting Contracts (Delta Neutral %), Offsetting Orders (pending), Unmitigated Cover at Risk. Filtered by `WalletAddress`. Shows connect prompt if not connected.
+
+### `/rewards`
+Token Rewards section from prototype. Tier table (Tiers 1–5, 7–17% APY). No Points. No images.
+
+### `/legal`
+Full legal disclaimer from prototype sidebar popup. All sections: General, No Advice, Representation & Warranties, Solicitation, Restricted Jurisdictions, No Offer of Securities, Privacy Policy, Forward-Looking Statements.
+
+---
+
+## Server Actions (`app/_actions/`)
+
+| File | Purpose |
+|---|---|
+| `testDb.ts` | DB connection test |
+| `prices.ts` | Jupiter Price API v6 for SOL/USDC/LINK; SSTM hardcoded at $9.024; 60 s in-memory cache; falls back to hardcoded constants |
+| `getTiers.ts` | Reads `Tiers` table. **Only `async` exports allowed** (`'use server'` constraint) |
+| `createHedgeOrder.ts` | Inserts row into `Orders` after successful on-chain `create_order` |
+| `getDashboardMetrics.ts` | `getMarketMetrics()` — platform aggregate. `getUserRiskMetrics(walletAddress)` — user-specific risk stats |
+
+**Rule:** Every export from a `'use server'` file must be `async`. Pure helpers go in `lib/`.
+
+---
+
+## Library Files (`lib/`)
+
+| File | Purpose |
+|---|---|
+| `db.ts` | mysql2 connection pool |
+| `auth.ts` | better-auth server config; `kycVerified` defaults to `true` for dev — flip to `false` pre-launch |
+| `auth-client.ts` | `useSession`, `signIn`, `signOut`, `signUp` |
+| `utils.ts` | `cn()` (clsx + tailwind-merge) |
+| `orderConstants.ts` | Payout conditions, annual odds, fixed-point encoding, mint addresses, program ID, contract durations, `matchTier()` |
+| `idl/condition_cover.json` | Anchor IDL copy — keep in sync with `smartcontracts/target/idl/condition_cover.json` |
 
 ---
 

@@ -1,0 +1,892 @@
+{
+  "address": "5PkPCbdZNFGYVJNjifxgZDGyeaMKmTeWPj4fxhYeeB9K",
+  "metadata": {
+    "name": "condition_cover",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_order",
+      "docs": [
+        "Cancel an Open order and return escrowed collateral to the owner."
+      ],
+      "discriminator": [
+        95,
+        129,
+        237,
+        240,
+        8,
+        49,
+        223,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "order",
+          "docs": [
+            "The Order PDA to cancel.",
+            "Constraint: caller must be the owner; order must be Open."
+          ],
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "Escrow token account — drained then closed; rent returned to owner."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token_account",
+          "docs": [
+            "Owner's token account — receives the returned collateral."
+          ],
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "The order owner; must sign; receives returned rent lamports."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_order",
+      "docs": [
+        "Create a Hedge or Cover order and lock collateral in a PDA escrow."
+      ],
+      "discriminator": [
+        141,
+        54,
+        37,
+        207,
+        237,
+        210,
+        250,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "order",
+          "docs": [
+            "The Order PDA: seeds = [b\"order\", owner, nonce]."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "PDA token account holding the locked collateral.",
+            "seeds = [b\"escrow\", order]",
+            "authority = order (so the program can sign transfers during match/settle/cancel)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token_account",
+          "docs": [
+            "Owner's token account — collateral is pulled from here."
+          ],
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "SPL token mint (USDC or SSTM)."
+          ]
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "The wallet creating the order; pays for account rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "order_type",
+          "type": {
+            "defined": {
+              "name": "OrderType"
+            }
+          }
+        },
+        {
+          "name": "index_name",
+          "type": {
+            "defined": {
+              "name": "IndexName"
+            }
+          }
+        },
+        {
+          "name": "index_level",
+          "type": "i64"
+        },
+        {
+          "name": "coverage",
+          "type": "u64"
+        },
+        {
+          "name": "hedge_premium",
+          "type": "u64"
+        },
+        {
+          "name": "expiration",
+          "type": "i64"
+        },
+        {
+          "name": "denomination",
+          "type": {
+            "defined": {
+              "name": "Denomination"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "match_order",
+      "docs": [
+        "Match a Hedge order with a compatible Cover order to create a live Contract."
+      ],
+      "discriminator": [
+        95,
+        230,
+        21,
+        6,
+        114,
+        23,
+        41,
+        111
+      ],
+      "accounts": [
+        {
+          "name": "contract",
+          "docs": [
+            "The Contract PDA: seeds = [b\"contract\", hedge_order, cover_order]."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hedge_order"
+              },
+              {
+                "kind": "account",
+                "path": "cover_order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "contract_escrow",
+          "docs": [
+            "Contract escrow: holds cover coverage until settlement.",
+            "seeds = [b\"contract_escrow\", contract]  authority = contract PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hedge_order",
+          "docs": [
+            "Hedge order — must be Open, type Hedge, compatible with cover_order."
+          ],
+          "writable": true
+        },
+        {
+          "name": "cover_order",
+          "docs": [
+            "Cover order — must be Open, type Cover."
+          ],
+          "writable": true
+        },
+        {
+          "name": "hedge_escrow",
+          "docs": [
+            "Hedge escrow — holds the premium; transferred to the cover party at match."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hedge_order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cover_escrow",
+          "docs": [
+            "Cover escrow — holds coverage collateral; moved to contract_escrow."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cover_order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cover_owner_token_account",
+          "docs": [
+            "Cover party's token account — receives the hedge premium at match time."
+          ],
+          "writable": true
+        },
+        {
+          "name": "hedge_owner_token_account",
+          "docs": [
+            "Hedge party's token account — recorded as payout destination if hedge wins."
+          ]
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "SPL token mint (must match both orders)."
+          ]
+        },
+        {
+          "name": "matcher",
+          "docs": [
+            "Wallet paying for the new Contract and contract_escrow accounts."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "settle",
+      "docs": [
+        "Oracle-signed instruction to settle a contract and pay out the winner.",
+        "Only the wallet at `constants::ORACLE_AUTHORITY` may call this."
+      ],
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "contract",
+          "docs": [
+            "The contract being settled."
+          ],
+          "writable": true
+        },
+        {
+          "name": "contract_escrow",
+          "docs": [
+            "Contract escrow — holds the coverage collateral to be paid to the winner.",
+            "seeds = [b\"contract_escrow\", contract]"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "winner_token_account",
+          "docs": [
+            "Token account that receives the escrowed payout.",
+            "Must equal `contract.hedge_token_account` when outcome = 1 (hedge wins),",
+            "or `contract.cover_token_account` when outcome = 0 (cover wins)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "oracle",
+          "docs": [
+            "The oracle wallet signing this transaction."
+          ],
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Contract",
+      "discriminator": [
+        172,
+        138,
+        115,
+        242,
+        121,
+        67,
+        183,
+        26
+      ]
+    },
+    {
+      "name": "Order",
+      "discriminator": [
+        134,
+        173,
+        223,
+        185,
+        77,
+        86,
+        28,
+        51
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnauthorizedOracle",
+      "msg": "Signer is not the authorized oracle"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadySettled",
+      "msg": "Contract has already been settled"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidOutcome",
+      "msg": "Invalid outcome — must be 0 (cover wins) or 1 (hedge wins)"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidWinnerAccount",
+      "msg": "Winner token account does not match the recorded destination for this outcome"
+    },
+    {
+      "code": 6004,
+      "name": "OrderExpired",
+      "msg": "Order expiration must be in the future"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidAmount",
+      "msg": "Coverage amount must be greater than zero"
+    },
+    {
+      "code": 6006,
+      "name": "OrderNotOpen",
+      "msg": "Order is not in Open status"
+    },
+    {
+      "code": 6007,
+      "name": "Unauthorized",
+      "msg": "Caller is not the order owner"
+    },
+    {
+      "code": 6008,
+      "name": "OrderTypeMismatch",
+      "msg": "Orders must be one Hedge and one Cover"
+    },
+    {
+      "code": 6009,
+      "name": "IndexMismatch",
+      "msg": "Orders have different index names or threshold levels"
+    },
+    {
+      "code": 6010,
+      "name": "DenominationMismatch",
+      "msg": "Orders have different denomination or mint"
+    },
+    {
+      "code": 6011,
+      "name": "AmountMismatch",
+      "msg": "Orders have different coverage or premium amounts"
+    }
+  ],
+  "types": [
+    {
+      "name": "Contract",
+      "docs": [
+        "On-chain state for a matched contract between a Hedge order and a Cover order.",
+        "",
+        "Created by `match_order` when a Hedge and Cover are paired.",
+        "Settled by `settle` (oracle-signed) with outcome 0 or 1."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hedge_order",
+            "docs": [
+              "Pubkey of the hedge Order account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "cover_order",
+            "docs": [
+              "Pubkey of the cover Order account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "hedge_token_account",
+            "docs": [
+              "Token account that receives escrowed funds if the hedge party wins (outcome = 1)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "cover_token_account",
+            "docs": [
+              "Token account that receives escrowed funds if the cover party wins (outcome = 0)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "expiration",
+            "docs": [
+              "Unix timestamp (seconds) after which the contract expires unsettled."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "outcome",
+            "docs": [
+              "Settlement outcome.",
+              "None  = not yet settled.",
+              "Some(1) = hedge party wins (index threshold was crossed).",
+              "Some(0) = cover party wins (contract expired without threshold crossing)."
+            ],
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed for the Contract account — used to sign CPIs from this PDA."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "escrow_bump",
+            "docs": [
+              "PDA bump for the contract escrow token account (seeds: [b\"contract_escrow\", contract]).",
+              "Stored so `settle` can reconstruct the escrow signer without extra accounts."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Denomination",
+      "docs": [
+        "SPL token used to denominate the contract."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Usdc"
+          },
+          {
+            "name": "Sstm"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IndexName",
+      "docs": [
+        "Space weather indices supported as contract triggers."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Kp"
+          },
+          {
+            "name": "Dst"
+          },
+          {
+            "name": "SolarXRayFlux"
+          },
+          {
+            "name": "SolarProtonFlux"
+          },
+          {
+            "name": "SolarRadioFlux"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Order",
+      "docs": [
+        "On-chain state for a hedge or cover order.",
+        "",
+        "Created by `create_order`; paired with `match_order`; cancelled with `cancel_order`.",
+        "A PDA token escrow account (seeds: [b\"escrow\", order.key()]) holds the locked collateral.",
+        "",
+        "Hedge orders lock `hedge_premium` in escrow.",
+        "Cover orders lock `coverage` in escrow."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_type",
+            "docs": [
+              "Hedge or Cover."
+            ],
+            "type": {
+              "defined": {
+                "name": "OrderType"
+              }
+            }
+          },
+          {
+            "name": "index_name",
+            "docs": [
+              "Space weather index this order is based on."
+            ],
+            "type": {
+              "defined": {
+                "name": "IndexName"
+              }
+            }
+          },
+          {
+            "name": "index_level",
+            "docs": [
+              "Payout threshold stored as fixed-point ×100.",
+              "Examples: Kp 5.0 → 500; Dst -120 nT → -12000."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "denomination",
+            "docs": [
+              "Token denomination (USDC or SSTM)."
+            ],
+            "type": {
+              "defined": {
+                "name": "Denomination"
+              }
+            }
+          },
+          {
+            "name": "coverage",
+            "docs": [
+              "Maximum payout / collateral amount in token base units.",
+              "Hedge: receives this if the index threshold is crossed.",
+              "Cover: locks this as their payout obligation."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "hedge_premium",
+            "docs": [
+              "Premium the hedge party pays to buy protection.",
+              "Locked in escrow for Hedge orders; received at match time by Cover party."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "expiration",
+            "docs": [
+              "Unix timestamp after which this order can no longer be matched."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "owner",
+            "docs": [
+              "Wallet that created this order."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "docs": [
+              "SPL token mint (USDC or SSTM mint address)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current lifecycle status."
+            ],
+            "type": {
+              "defined": {
+                "name": "OrderStatus"
+              }
+            }
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Client-supplied nonce — enables multiple open orders per owner.",
+              "Incorporated into the PDA seeds: [b\"order\", owner, nonce]."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump for the Order account itself."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "escrow_bump",
+            "docs": [
+              "PDA bump for the associated escrow token account (seeds: [b\"escrow\", order])."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderStatus",
+      "docs": [
+        "Lifecycle state of an order."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Matched"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderType",
+      "docs": [
+        "Hedge = buying protection; Cover = selling protection (collecting premium)."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Hedge"
+          },
+          {
+            "name": "Cover"
+          }
+        ]
+      }
+    }
+  ]
+}
