@@ -17,6 +17,7 @@ import {
   CONTRACT_DURATIONS,
 } from "@/lib/orderConstants";
 import { createHedgeOrder } from "@/app/_actions/createHedgeOrder";
+import { Tooltip } from "@/components/tooltip";
 import type { Tier } from "@/app/_actions/getTiers";
 import type { TokenPrices } from "@/app/_actions/prices";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -30,13 +31,17 @@ interface HedgeFormProps {
 function formatDate(date: Date): string {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const d = date.getDate().toString().padStart(2, "0");
-  return `${d} ${months[date.getMonth()]} ${date.getFullYear()} 11:59 PM`;
+  const h = date.getHours();
+  const m = date.getMinutes().toString().padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = (h % 12 || 12).toString().padStart(2, "0");
+  return `${d} ${months[date.getMonth()]} ${date.getFullYear()} ${h12}:${m} ${ampm}`;
 }
 
 export function HedgeForm({ tiers, prices }: HedgeFormProps) {
   // ── Section 1 state ─────────────────────────────────────────────────────────
-  const [orderTiming, setOrderTiming] = useState<"Market" | "Committed" | "">("");
-  const [orderDuration, setOrderDuration] = useState<string>("");
+  const [orderDurationDays, setOrderDurationDays] = useState<string>("");
+  const [orderDurationHours, setOrderDurationHours] = useState<string>("");
   const [currency, setCurrency] = useState<"USDC" | "SSTM" | "">("");
   const [indexName, setIndexName] = useState<"Dst" | "Kp" | "">("");
   const [conditionKey, setConditionKey] = useState<string>("");
@@ -78,23 +83,22 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
   const feeRate = currency === "USDC" ? (matchedTier?.USDCserviceFee ?? 0) : (matchedTier?.SSTMserviceFee ?? 0);
   const serviceFee = adjustedPremium * feeRate;
 
-  const layer1Usd = orderTiming === "Committed" ? 0.15 : 0.10;
+  const layer1Usd = 0.15;
   const layer1Sol = prices.SOL > 0 ? layer1Usd / prices.SOL : 0;
   const layer1Token = tokenPrice > 0 ? layer1Usd / tokenPrice : 0;
   const totalCost = adjustedPremium + serviceFee + layer1Token;
 
   const availableConditions = indexName === "Dst" ? DST_CONDITIONS : indexName === "Kp" ? KP_CONDITIONS : [];
 
-  const orderExpiresAt =
-    orderTiming === "Committed" && orderDuration
-      ? new Date(Date.now() + parseInt(orderDuration, 10) * 86_400_000)
-      : null;
+  const orderDurationMs =
+    (parseInt(orderDurationDays, 10) || 0) * 24 * 3_600_000 +
+    (parseInt(orderDurationHours, 10) || 0) * 3_600_000;
+  const orderExpiresAt = orderDurationMs > 0 ? new Date(Date.now() + orderDurationMs) : null;
 
   // ── Validation ───────────────────────────────────────────────────────────────
   function validate(): Record<string, boolean> {
     const e: Record<string, boolean> = {};
-    if (!orderTiming) e.orderTiming = true;
-    if (orderTiming === "Committed" && !orderDuration) e.orderDuration = true;
+    if (!orderDurationDays && !orderDurationHours) e.orderDuration = true;
     if (!currency) e.currency = true;
     if (!indexName) e.indexName = true;
     if (!conditionKey) e.condition = true;
@@ -175,8 +179,8 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
 
       // Write to MySQL
       await createHedgeOrder({
-        orderTiming: orderTiming as "Market" | "Committed",
-        orderDuration: orderTiming === "Committed" ? parseInt(orderDuration, 10) : null,
+        orderTiming: "Committed",
+        orderDuration: orderDurationDays ? parseInt(orderDurationDays, 10) : null,
         expirationDate: orderExpiresAt?.toISOString() ?? null,
         formattedExpiration: orderExpiresAt ? formatDate(orderExpiresAt) : null,
         currency: currency as "USDC" | "SSTM",
@@ -199,7 +203,7 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
 
       setResult({ ok: true, sig });
       // Reset form
-      setOrderTiming(""); setOrderDuration(""); setCurrency(""); setIndexName("");
+      setOrderDurationDays(""); setOrderDurationHours(""); setCurrency(""); setIndexName("");
       setConditionKey(""); setContractDuration(""); setCoverage("");
       setAdjEnabled(false); setAdj(1.0); setAcknowledged(false);
       setFieldErrors({});
@@ -220,65 +224,61 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
         <div className="space-y-6">
 
           {/* Section 1: Order Parameters */}
-          <section className="rounded-lg border border-border p-6 space-y-5">
-            <h2 className="text-lg font-semibold">Order Parameters</h2>
+          <section className="rounded-lg border border-border space-y-2">
+            <h2 className="w-full bg-gray-200 dark:bg-gray-800 pl-3 pr-2 py-1.5 font-medium rounded-t-lg">
+              <span className="font-bold">1.&nbsp;&nbsp;</span>Select Required Order Parameters
+            </h2>
+            <div className="pb-0">
 
-            {/* Order Timing */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Order Timing</label>
-              <div className="flex flex-wrap gap-3">
-                {(["Market", "Committed"] as const).map((t) => (
-                  <label
-                    key={t}
+            {/* Order Duration */}
+            <div className="px-6 pt-2 pb-3 flex items-center justify-between">
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+                  Order Duration
+                  <Tooltip wide content={<>Committed orders allow you to set an expiration window which automatically cancels the order after the period you choose. The funds held in escrow are returned to your wallet upon cancellation.</>} />
+                </label>
+                <div className="flex gap-3">
+                  <select
+                    value={orderDurationDays}
+                    onChange={(e) => { setOrderDurationDays(e.target.value); setFieldErrors((er) => ({ ...er, orderDuration: false })); }}
                     className={cn(
-                      "flex items-center gap-2 cursor-pointer rounded-md border px-4 py-2 text-sm transition-colors",
-                      orderTiming === t ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
-                      fieldErrors.orderTiming && "ring-2 ring-red-500"
+                      "w-full rounded-md border border-border bg-background px-3 py-2 text-sm",
+                      fieldErrors.orderDuration && !orderDurationHours && "ring-2 ring-red-500"
                     )}
                   >
-                    <input
-                      type="radio"
-                      name="orderTiming"
-                      value={t}
-                      checked={orderTiming === t}
-                      onChange={() => { setOrderTiming(t); setFieldErrors((e) => ({ ...e, orderTiming: false })); }}
-                      className="accent-primary"
-                    />
-                    {t === "Market" ? "Real-Time Market" : "Committed"}
-                  </label>
-                ))}
+                    <option value="">Select days…</option>
+                    {Array.from({ length: 90 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={orderDurationHours}
+                    onChange={(e) => { setOrderDurationHours(e.target.value); setFieldErrors((er) => ({ ...er, orderDuration: false })); }}
+                    className={cn(
+                      "w-full rounded-md border border-border bg-background px-3 py-2 text-sm",
+                      fieldErrors.orderDuration && !orderDurationDays && "ring-2 ring-red-500"
+                    )}
+                  >
+                    <option value="">Select hours…</option>
+                    {Array.from({ length: 23 }, (_, i) => i + 1).map((h) => (
+                      <option key={h} value={h}>{h} hour{h > 1 ? "s" : ""}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              {orderTiming === "Market" && (
-                <p className="text-xs text-muted-foreground mt-1.5">Order waits on-chain until matched. No expiration.</p>
-              )}
-              {orderTiming === "Committed" && (
-                <p className="text-xs text-muted-foreground mt-1.5">Order expires if unmatched; escrow is returned.</p>
+              {orderExpiresAt && (
+                <p className="text-xs text-muted-foreground">Expires: {formatDate(orderExpiresAt)}</p>
               )}
             </div>
 
-            {/* Order Duration (Committed only) */}
-            {orderTiming === "Committed" && (
-              <div>
-                <label className="block text-sm font-medium mb-2">Order Duration</label>
-                <select
-                  value={orderDuration}
-                  onChange={(e) => setOrderDuration(e.target.value)}
-                  className={cn(
-                    "w-full rounded-md border border-border bg-background px-3 py-2 text-sm",
-                    fieldErrors.orderDuration && "ring-2 ring-red-500"
-                  )}
-                >
-                  <option value="">Select days…</option>
-                  {Array.from({ length: 90 }, (_, i) => i + 1).map((d) => (
-                    <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <hr className="border-border mx-6" />
 
             {/* Contract Currency */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Contract Currency</label>
+            <div className="px-6 pt-2 pb-3">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+                Contract Currency
+                <Tooltip wide content={<>Users must select which crypto currency token is to be used for both Hedge Premiums and Coverage for this risk transfer smart contract.<br /><br /><span className="font-semibold">Orders using USDC:</span> Standard contract service fee tiers.<br /><br /><span className="font-semibold">Orders using SSTM:</span> Discounted service fees by 25%. Cover parties earn SSTM token rewards based on coverage provided (up to 17% APY).</>} />
+              </label>
               <div className="flex flex-wrap gap-3">
                 {(["USDC", "SSTM"] as const).map((c) => (
                   <label
@@ -303,9 +303,14 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
               </div>
             </div>
 
+            <hr className="border-border mx-6" />
+
             {/* Space Weather Index */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Space Weather Index</label>
+            <div className="px-6 pt-2 pb-3">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+                Space Weather Index
+                <Tooltip wide content={<>Select the desired Space Weather Index to be used in this contract. Geomagnetic storms, which can negatively impact satellites, electrical grids, and any business operations reliant on both, are measured using the Dst and Kp indices.</>} />
+              </label>
               <select
                 value={indexName}
                 onChange={(e) => {
@@ -314,7 +319,7 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
                   setFieldErrors((er) => ({ ...er, indexName: false, condition: false }));
                 }}
                 className={cn(
-                  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm",
+                  "w-1/3 rounded-md border border-border bg-background px-3 py-2 text-sm",
                   fieldErrors.indexName && "ring-2 ring-red-500"
                 )}
               >
@@ -324,38 +329,50 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
               </select>
             </div>
 
+            <hr className="border-border mx-6" />
+
             {/* Payout Condition */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Payout Condition</label>
-              <select
-                value={conditionKey}
-                onChange={(e) => { setConditionKey(e.target.value); setFieldErrors((er) => ({ ...er, condition: false })); }}
-                disabled={!indexName}
-                className={cn(
-                  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-50",
-                  fieldErrors.condition && "ring-2 ring-red-500"
-                )}
-              >
-                <option value="">Select condition…</option>
-                {availableConditions.map((c) => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
-                ))}
-              </select>
+            <div className="px-6 pt-2 pb-3 flex items-center justify-between">
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+                  Payout Condition
+                  <Tooltip wide content={<>Select the desired payout condition that must occur for the coverage payout to be parametrically made to the Hedge user.<br /><br />For example, a hedge user seeking to hedge against a 100-year geomagnetic event would select:<br /><br />Space Weather Index: <span className="font-semibold">Disturbance Storm Time (Dst)</span><br />Payout Condition: <span className="font-semibold">-850 nT (Extreme, 1859 Carrington)</span><br /><br />Note: Each payout condition has a unique probability of occurring, displayed as Annual Payout Odds.</>} />
+                </label>
+                <select
+                  value={conditionKey}
+                  onChange={(e) => { setConditionKey(e.target.value); setFieldErrors((er) => ({ ...er, condition: false })); }}
+                  disabled={!indexName}
+                  className={cn(
+                    "w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-50",
+                    fieldErrors.condition && "ring-2 ring-red-500"
+                  )}
+                >
+                  <option value="">Select condition…</option>
+                  {availableConditions.map((c) => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
               {condition && (
-                <p className="text-xs text-muted-foreground mt-1.5">
+                <p className="text-xs text-muted-foreground">
                   Annual payout odds: <span className="text-red-500 font-medium">{(annualOdds * 100).toFixed(4)}%</span>
                 </p>
               )}
             </div>
 
+            <hr className="border-border mx-6" />
+
             {/* Contract Duration */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Contract Duration</label>
+            <div className="px-6 pt-2 pb-3">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+                Contract Duration
+                <Tooltip wide content={<>This is the length of the resulting smart contract. The contract start date is the date and time the orders were matched; the end date is the start date plus this duration.</>} />
+              </label>
               <select
                 value={contractDuration}
                 onChange={(e) => { setContractDuration(e.target.value); setFieldErrors((er) => ({ ...er, contractDuration: false })); }}
                 className={cn(
-                  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm",
+                  "w-1/3 rounded-md border border-border bg-background px-3 py-2 text-sm",
                   fieldErrors.contractDuration && "ring-2 ring-red-500"
                 )}
               >
@@ -366,106 +383,144 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
               </select>
             </div>
 
+            <hr className="border-border mx-6" />
+
             {/* Coverage Sought */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Coverage Sought</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none">$</span>
-                <input
-                  type="number"
-                  value={coverage}
-                  onChange={(e) => { setCoverage(e.target.value); setFieldErrors((er) => ({ ...er, coverage: false })); }}
-                  min={1}
-                  max={10_000_000_000}
-                  step={1}
-                  placeholder="0"
-                  className={cn(
-                    "w-full rounded-md border border-border bg-background pl-7 pr-3 py-2 text-sm",
-                    fieldErrors.coverage && "ring-2 ring-red-500"
-                  )}
-                />
+            <div className="px-6 pt-2 pb-3 flex items-center gap-4 justify-between">
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+                  Coverage Sought
+                  <Tooltip wide content={<>Hedge users input the desired coverage sought, the dollar amount that will be paid out if the payout condition is met during the contract period.</>} />
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={coverage ? parseInt(coverage, 10).toLocaleString("en-US") : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/,/g, "");
+                      if (/^\d*$/.test(raw) && Number(raw) <= 10_000_000_000) {
+                        setCoverage(raw);
+                        setFieldErrors((er) => ({ ...er, coverage: false }));
+                      }
+                    }}
+                    placeholder="0"
+                    className={cn(
+                      "w-full rounded-md border border-border bg-background pl-7 pr-3 py-2 text-sm",
+                      fieldErrors.coverage && "ring-2 ring-red-500"
+                    )}
+                  />
+                </div>
               </div>
-              {matchedTier && coverageNum > 0 && (
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Coverage tier: <span className="font-medium">{matchedTier.Name}</span>
-                  {" · "}Service fee rate:{" "}
-                  <span className="font-medium">
-                    {((currency === "USDC" ? matchedTier.USDCserviceFee : matchedTier.SSTMserviceFee) * 100).toFixed(2)}%
-                  </span>
-                </p>
-              )}
+
+              <div className="flex-1 text-center">
+                {matchedTier && coverageNum > 0 && (
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Coverage tier: <span className="font-medium">{matchedTier.Name}</span><br />
+                    Service fee rate:{" "}
+                    <span className="font-medium">
+                      {((currency === "USDC" ? matchedTier.USDCserviceFee : matchedTier.SSTMserviceFee) * 100).toFixed(2)}%
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              {/* Probability Based Hedge Premium */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={cn("text-xs", adjEnabled && adj !== 1.0 ? "text-muted-foreground" : "text-muted-foreground")}>
+                  Probability Based<br />Hedge Premium
+                </span>
+                <span className={cn("text-sm font-medium", adjEnabled && adj !== 1.0 ? "text-muted-foreground" : "")}>
+                  {basePremium > 0 && tokenPrice > 0
+                    ? `$${(basePremium * tokenPrice).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                    : "—"}
+                </span>
+              </div>
+            </div>
             </div>
           </section>
 
           {/* Section 2: Optional Features */}
-          <section className="rounded-lg border border-border p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Optional Features</h2>
+          <section className="rounded-lg border border-border space-y-2">
+            <h2 className="w-full bg-gray-200 dark:bg-gray-800 pl-3 pr-2 py-1.5 font-medium rounded-t-lg">
+              <span className="font-bold">2.&nbsp;&nbsp;</span>Optional Order Features
+            </h2>
+            <div className="flex items-center h-[50px] px-6">
+              {/* Label */}
+              <div className="flex items-center gap-1.5 w-56 shrink-0 text-sm font-medium">
+                Hedge Premium Adjustment
+                <Tooltip wide content={<>This optional adjustment allows you to multiply the hedge premium paid to Cover parties to secure coverage.<br /><br />Toggle the feature on, then enter a multiplier (0.05× to 5.0×).<br /><br />A higher multiplier makes your order more attractive to Cover parties and speeds up matching. A lower multiplier reduces your cost but may take longer to match.<br /><br />Example: a 1.2× adjustment gives Cover parties a 20% premium increase over the standard probability-based rate.</>} />
+              </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setAdjEnabled((v) => !v)}
-                className={cn(
-                  "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-                  adjEnabled ? "bg-primary" : "bg-muted"
-                )}
-                aria-pressed={adjEnabled}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
-                    adjEnabled ? "translate-x-6" : "translate-x-1"
-                  )}
-                />
-              </button>
-              <span className="text-sm font-medium">Hedge Premium Adjustment</span>
-
-              {/* Help tooltip */}
-              <div className="relative group">
+              {/* Toggle */}
+              <div className="flex items-center gap-2 w-32 shrink-0">
                 <button
                   type="button"
-                  className="flex h-5 w-5 items-center justify-center rounded-full border border-muted-foreground text-muted-foreground text-xs"
+                  onClick={() => { setAdjEnabled((v) => !v); if (adjEnabled) setAdj(1.0); }}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+                    adjEnabled ? "bg-primary" : "bg-gray-400"
+                  )}
+                  aria-pressed={adjEnabled}
                 >
-                  ?
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                      adjEnabled ? "translate-x-6" : "translate-x-1"
+                    )}
+                  />
                 </button>
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 rounded-md bg-foreground px-3 py-2 text-xs text-background shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none z-10">
-                  Multiply your offered premium relative to the base actuarial rate. A higher multiplier
-                  makes your order more attractive to Cover parties; lower reduces your cost but may take
-                  longer to match.
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
-                </div>
+                <span className="text-sm text-muted-foreground">{adjEnabled ? "Enabled" : "Disabled"}</span>
               </div>
-            </div>
 
-            {adjEnabled && (
-              <div className="space-y-2 pl-14">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Multiplier</span>
-                  <span className="font-medium tabular-nums">{adj.toFixed(2)}×</span>
+              {/* Number input + percentage — visible when enabled */}
+              {adjEnabled && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={adj}
+                    min={0.05}
+                    max={5.0}
+                    step={0.05}
+                    onChange={(e) => setAdj(Math.max(0.05, Math.min(5.0, parseFloat(e.target.value) || 0.05)))}
+                    className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm text-center"
+                  />
+                  {adj !== 1.0 && (
+                    <span className="text-sm font-medium tabular-nums">
+                      {adj > 1 ? "+" : ""}{((adj - 1) * 100).toFixed(0)}%
+                    </span>
+                  )}
                 </div>
-                <input
-                  type="range"
-                  min={0.05}
-                  max={5.0}
-                  step={0.05}
-                  value={adj}
-                  onChange={(e) => setAdj(parseFloat(e.target.value))}
-                  className="w-full accent-primary"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>0.05×</span>
-                  <span>1.0×</span>
-                  <span>5.0×</span>
+              )}
+
+              <div className="grow" />
+
+              {/* Adjusted premium — visible when enabled */}
+              {adjEnabled && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {adj === 1.0 ? "Hedge Premium" : <>Adjusted<br />Hedge Premium</>}
+                  </span>
+                  <span className="text-sm font-medium">
+                    {adjustedPremium > 0 && tokenPrice > 0
+                      ? `$${(adjustedPremium * tokenPrice).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                      : "—"}
+                  </span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            <div className="pb-2" />
           </section>
         </div>
 
         {/* ── Right panel: Order Summary ──────────────────────────────────────── */}
         <div>
-          <div className="rounded-lg border border-border p-6 space-y-4 sticky top-24">
-            <h2 className="text-lg font-semibold">Order Summary</h2>
+          <div className="rounded-lg border border-border space-y-4 sticky top-24">
+            <h2 className="w-full bg-gray-200 dark:bg-gray-800 pl-3 pr-2 py-1.5 font-medium rounded-t-lg">
+              <span className="font-bold">3.&nbsp;&nbsp;</span>Order Summary
+            </h2>
+            <div className="px-6 pb-6 space-y-4">
 
             {/* Always-visible rows */}
             <div className="space-y-2 text-sm">
@@ -534,7 +589,7 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
                     small
                   />
                 </div>
-                {orderTiming === "Committed" && orderExpiresAt && (
+                {orderExpiresAt && (
                   <SummaryRow label="Order Expiration" value={formatDate(orderExpiresAt)} small />
                 )}
               </div>
@@ -612,6 +667,7 @@ export function HedgeForm({ tiers, prices }: HedgeFormProps) {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

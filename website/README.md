@@ -1,6 +1,6 @@
 # ConditionCover — Website
 
-Next.js 16 frontend for the ConditionCover space-weather risk hedging platform. Provides the marketplace for creating and managing Hedge and Cover orders, live contract monitoring, SSTM token rewards, and user analytics.
+Next.js 16 frontend for the ConditionCover environmental risk hedging platform launching with space weather. Provides the marketplace for creating and managing Hedge and Cover orders, live contract monitoring, SSTM token rewards, and user analytics.
 
 This is a full rebuild of [ConditionCover.com](https://conditioncover.com), replacing the original AWS Amplify / DynamoDB backend with MySQL and Solana smart contracts.
 
