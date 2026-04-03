@@ -1,4 +1,10 @@
 pub mod cancel_order;
+pub mod create_loop_set;
 pub mod create_order;
+pub mod fund_treasury;
+pub mod init_treasury;
+pub mod issue_loop_loan;
 pub mod match_order;
+pub mod register_loop_contract;
 pub mod settle;
+pub mod settle_loop_set;

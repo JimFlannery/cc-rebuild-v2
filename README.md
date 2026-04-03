@@ -10,10 +10,11 @@ This repository is a full rebuild of [ConditionCover.com](https://conditioncover
 
 ## How It Works
 
-1. A **Hedge party** pays a premium and receives a payout if a specified space weather event occurs (e.g. Kp-Index ≥ 5).
+1. A **Hedge party** pays a premium and receives a payout if a specified space weather event occurs (e.g. Kp-Index ≥ 5 or Dst < −850 nT).
 2. A **Cover party** collects the premium as yield and absorbs the loss if the event occurs.
 3. A **custom oracle** polls NOAA SWPC data on a continuous basis and automatically settles the on-chain contract when a threshold is crossed or the contract expires.
 4. All collateral is held in escrow on Solana (USDC or SSTM) and transferred to the winner without manual intervention.
+5. **Yield Boost** allows Cover parties to amplify returns via delta-neutral looping — the platform treasury issues SSTM loans to fund additional looped contract pairs.
 
 ---
 
@@ -28,10 +29,60 @@ cc-rebuild-v2/
 │                       settlement transactions
 ├── smartcontracts/     Solana on-chain program (Anchor / Rust) — holds
 │                       collateral in escrow, enforces oracle authority,
-│                       transfers funds to the winning party
+│                       transfers funds to the winning party; includes
+│                       Yield Boost looping (Treasury + LoopSet)
 └── website/            Next.js 16 frontend — marketplace, order creation,
-                        contract management, rewards, and analytics
+                        contract management, Yield Boost, Learn, and rewards
 ```
+
+---
+
+## Build Status
+
+### Website — `website/`
+
+| Component | Status |
+|---|---|
+| Homepage (5 opportunity cards, market summary bar) | ✓ Built |
+| Markets page (order cards, sidebar filters) | ✓ Built |
+| Order detail page (`/orders/[id]` + CoverForm) | ✓ Built |
+| Hedge order creation (`/hedge`) | ✓ Built |
+| Yield Boost / Looping (`/yieldboost`) | ✓ Built |
+| Dashboards (Market Metrics, Space Weather, Risk Management) | ✓ Built |
+| Learn page (6 lessons, YouTube embed) | ✓ Built |
+| Rewards page (SSTM tier table) | ✓ Built |
+| Legal disclaimer | ✓ Built |
+| Contracts monitoring (`/contracts`) | Planned |
+| Profile, Notifications, Feedback, Invite | Planned |
+
+### Smart Contracts — `smartcontracts/`
+
+| Component | Status |
+|---|---|
+| `create_order` — lock collateral into PDA escrow | ✓ Implemented |
+| `match_order` — pair orders, create Contract account | ✓ Implemented |
+| `cancel_order` — release escrow, close Order account | ✓ Implemented |
+| `settle` — oracle settles, transfers to winner | ✓ Implemented |
+| `init_treasury` / `fund_treasury` — Yield Boost treasury | ✓ Implemented |
+| `create_loop_set` — delta-neutral loop registry | ✓ Implemented |
+| `issue_loop_loan` — Treasury → users SSTM loans | ✓ Implemented |
+| `register_loop_contract` — link Contract into LoopSet | ✓ Implemented |
+| `settle_loop_set` — collect interest, mark settled | ✓ Implemented |
+| Integration tests (24/24 passing on localnet) | ✓ Complete |
+| Deploy to devnet | Pending |
+
+### Oracle — `oracle/`
+
+| Component | Status |
+|---|---|
+| Kp-Index poller (NOAA SWPC) | ✓ Implemented |
+| Dst-Index poller (Kyoto WDC) | ✓ Implemented |
+| Solar X-Ray Flux poller (NOAA GOES) | ✓ Implemented |
+| Solar Proton Flux poller (NOAA GOES) | ✓ Implemented |
+| Solar Radio Flux / F10.7 poller (NOAA SWPC) | ✓ Implemented |
+| `settle` instruction client | ✓ Implemented |
+| MySQL status updates after settlement | ✓ Implemented |
+| End-to-end devnet test | Pending |
 
 ---
 
@@ -54,27 +105,29 @@ cc-rebuild-v2/
 
 Contracts can be written against any of the following indices:
 
-| Index | Source | Unit | Update Frequency |
+| Index | Source | Unit | Payout condition |
 |---|---|---|---|
-| Kp (Planetary K-Index) | NOAA SWPC | 0–9 scale | 1 minute |
-| Dst (Disturbance Storm Time) | Kyoto World Data Center | nT | Hourly |
-| Solar X-Ray Flux | NOAA GOES | W/m² | 1 minute |
-| Solar Proton Flux | NOAA GOES | pfu (≥10 MeV) | 5 minutes |
-| Solar Radio Flux (F10.7) | NOAA SWPC | sfu | 3× daily |
+| Kp (Planetary K-Index) | NOAA SWPC | 0–9 scale | `Kp ≥ threshold` |
+| Dst (Disturbance Storm Time) | Kyoto World Data Center | nT | `Dst < threshold` (negative storms) |
+| Solar X-Ray Flux | NOAA GOES | W/m² | `flux ≥ threshold` |
+| Solar Proton Flux | NOAA GOES | pfu (≥10 MeV) | `flux ≥ threshold` |
+| Solar Radio Flux (F10.7) | NOAA SWPC | sfu | `flux ≥ threshold` |
+
+**Fixed-point encoding:** `IndexLevel` is stored as an integer ×100 both on-chain and in MySQL. The oracle divides by 100 before comparing. E.g. Kp 7.0 → `700`; Dst −850 nT → `−85000`.
 
 ---
 
 ## Authentication & Access
 
-The site is publicly browsable. Full trading access requires completing three steps in sequence:
+The site is publicly browsable. Full trading access requires three steps in sequence:
 
 | Step | Requirement | Unlocks |
 |---|---|---|
-| 1 | Register / Login (Better Auth) | Profile, notifications, order history |
-| 2 | KYC / AML verification (third-party) | Connect Wallet button |
+| 1 | Register / Login (Better Auth) | Profile, order history |
+| 2 | KYC / AML verification (third-party — not yet live) | Connect Wallet button |
 | 3 | Connect Phantom wallet | Create and manage orders |
 
-See `website/CLAUDE.md` for full auth flow documentation.
+`kycVerified` defaults to `true` in `website/lib/auth.ts` during development — flip to `false` before launch.
 
 ---
 
@@ -93,7 +146,7 @@ Each component has its own setup guide in its subdirectory `CLAUDE.md`.
 | MySQL | 8.x | Website, Oracle |
 | Phantom | latest | Testing wallet flows |
 
-> Smart contract development requires WSL2 (Ubuntu 22.04) on Windows.
+> Smart contract development requires **WSL2 (Ubuntu 22.04)** on Windows.
 
 ### Quick Start
 
@@ -106,7 +159,8 @@ cd oracle && npm install && cp .env.example .env
 # fill in .env, then:
 npm start
 
-# Smart contracts (WSL2)
+# Smart contracts (WSL2 — set PATH first)
+export PATH="/home/jimf/.cargo/bin:/home/jimf/.local/share/solana/install/active_release/bin:$PATH"
 cd smartcontracts && anchor build && anchor test
 ```
 
@@ -128,11 +182,18 @@ BETTER_AUTH_URL=http://localhost:3000
 NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 ```
 
-After changing `website/lib/auth.ts`, re-run the Better Auth migration:
+### Database Migrations
 
-```bash
-cd website && echo "y" | npx @better-auth/cli migrate --config lib/auth.ts
+Run all three migrations against `condition_cover` in MySQL CLI:
+
+```sql
+USE condition_cover;
+SOURCE website/scripts/migrations/001_add_loop_variables.sql;
+SOURCE website/scripts/migrations/002_add_loop_sets.sql;
+SOURCE website/scripts/migrations/003_add_yield_boost_standard.sql;
 ```
+
+All three have been applied to the local development database as of 2026-04-02.
 
 ---
 

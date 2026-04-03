@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "C:\\Users\\jim-f\\source\\repos\\cc-rebuild-v2\\website\\app\\learn"
+    ],
+    "allow": [
+      "Bash(cargo build-bpf:*)"
+    ]
+  }
+}

@@ -77,6 +77,11 @@ CREATE TABLE IF NOT EXISTS Orders (
   DenominationAddress      VARCHAR(44)    NULL,
   WalletAddress            VARCHAR(44)    NULL,
   OrderAddress             VARCHAR(44)    NULL,
+  IsLoopOrder              TINYINT(1)     NULL     DEFAULT 0,
+  LoopSetID                VARCHAR(36)    NULL,
+  LoopNumber               TINYINT        NULL     COMMENT '0=initial offsetting pair, 1=loop 1, 2=loop 2, etc.',
+  LoopNumLoops             TINYINT        NULL     COMMENT 'Requested number of loops (set on the seed order)',
+  LoopLoanAmount           DECIMAL(18,8)  NULL     COMMENT 'SSTM loaned from treasury to fund this loop',
   owner                    VARCHAR(255)   NULL,
   createdAt                DATETIME       NOT NULL,
   updatedAt                DATETIME       NOT NULL,
@@ -104,7 +109,38 @@ CREATE TABLE IF NOT EXISTS Contracts (
 );
 
 -- ---------------------------------------------------------------------------
--- 4. IndexProbabilities
+-- 4. LoopSets
+-- ---------------------------------------------------------------------------
+-- One record per matched loop pair. Created when two users match on the
+-- Looping page. All auto-generated Orders reference this via LoopSetID.
+-- Rates are snapshotted from VariableSettings at creation time so a later
+-- admin change does not retroactively affect active loop sets.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS LoopSets (
+  id                   VARCHAR(36)    NOT NULL DEFAULT (UUID()),
+  User1ID              VARCHAR(255)   NULL     COMMENT 'Cover party on initial contracts',
+  User2ID              VARCHAR(255)   NULL     COMMENT 'Hedge party on initial contracts (Cover on offsetting)',
+  Status               ENUM('Pending','Active','Settled','Cancelled') NULL DEFAULT 'Pending',
+  InitialCover         DECIMAL(18,8)  NULL     COMMENT 'Cover amount provided by each user (SSTM)',
+  NumLoops             TINYINT        NULL,
+  TotalCoverDeployed   DECIMAL(18,8)  NULL     COMMENT 'InitialCover × leverage factor across all loops',
+  TotalLoansIssued     DECIMAL(18,8)  NULL     COMMENT 'Sum of all SSTM loans from treasury',
+  TotalInterestOwed    DECIMAL(18,8)  NULL     COMMENT 'Total interest owed at maturity (from rewards pool)',
+  TotalFeesCollected   DECIMAL(18,8)  NULL     COMMENT 'Total USDC fees collected upfront',
+  RewardAPY            DECIMAL(10,6)  NULL     COMMENT 'Snapshotted from VariableSettings.LoopRewardAPY',
+  HedgePremiumPct      DECIMAL(10,6)  NULL     COMMENT 'Snapshotted from VariableSettings.LoopHedgePremiumPct',
+  FeePct               DECIMAL(10,6)  NULL     COMMENT 'Snapshotted from VariableSettings.LoopFeePct',
+  LoanAPR              DECIMAL(10,6)  NULL     COMMENT 'Snapshotted from VariableSettings.LoopLoanAPR',
+  LTV                  DECIMAL(10,6)  NULL     COMMENT 'Snapshotted from VariableSettings.LoopLTV',
+  SettledAt            DATETIME       NULL,
+  owner                VARCHAR(255)   NULL,
+  createdAt            DATETIME       NOT NULL,
+  updatedAt            DATETIME       NOT NULL,
+  PRIMARY KEY (id)
+);
+
+-- ---------------------------------------------------------------------------
+-- 5. IndexProbabilities
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS IndexProbabilities (
   id                  VARCHAR(36)    NOT NULL DEFAULT (UUID()),
@@ -150,6 +186,18 @@ CREATE TABLE IF NOT EXISTS VariableSettings (
   MOSfee            DECIMAL(10,6)  NULL,
   GEMpadding        DECIMAL(18,8)  NULL,
   MinimumMOScover   DECIMAL(18,8)  NULL,
+  -- Yield Boost (standard contracts — treasury acts as hedge party)
+  YieldBoostMinCoverage      DECIMAL(18,8)  NULL     DEFAULT 2000.00000000 COMMENT 'Min SSTM coverage (USD) to qualify for standard Yield Boost',
+  YieldBoostMaxUncoveredRisk DECIMAL(18,8)  NULL     DEFAULT 1000000.00000000 COMMENT 'When treasury uncovered risk reaches this amount a $1M hedge order is created',
+  YieldBoostMaxLoops         TINYINT        NULL     DEFAULT 2 COMMENT 'Max loops for standard Yield Boost (individual cover parties)',
+  -- Yield Boost (looping — whale pairs)
+  LoopRewardAPY     DECIMAL(10,6)  NULL     DEFAULT 0.170000,
+  LoopHedgePremiumPct DECIMAL(10,6) NULL    DEFAULT 0.010000,
+  LoopFeePct        DECIMAL(10,6)  NULL     DEFAULT 0.010000,
+  LoopLoanAPR       DECIMAL(10,6)  NULL     DEFAULT 0.075000,
+  LoopLTV           DECIMAL(10,6)  NULL     DEFAULT 0.670000,
+  LoopMaxLoops      TINYINT        NULL     DEFAULT 10,
+  LoopDefaultLoops  TINYINT        NULL     DEFAULT 2,
   createdAt         DATETIME       NOT NULL,
   updatedAt         DATETIME       NOT NULL,
   PRIMARY KEY (id)

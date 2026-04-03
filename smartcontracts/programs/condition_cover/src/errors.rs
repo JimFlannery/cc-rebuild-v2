@@ -31,4 +31,24 @@ pub enum ConditionCoverError {
     DenominationMismatch,
     #[msg("Orders have different coverage or premium amounts")]
     AmountMismatch,
+
+    // --- Yield Boost / Looping ---
+    #[msg("Number of loops exceeds the maximum of 10")]
+    LoopCountExceeded,
+    #[msg("LTV must be > 0 and < 100%; loan APR must be > 0")]
+    InvalidLoopParams,
+    #[msg("LoopSet is not in Active status")]
+    LoopSetNotActive,
+    #[msg("loop_number must equal the current loops_deployed value — call in sequence")]
+    LoopNumberMismatch,
+    #[msg("Treasury does not have sufficient SSTM balance for this loan")]
+    InsufficientTreasuryBalance,
+    #[msg("LoopSet contract registry is full (max 22 contracts)")]
+    LoopSetFull,
+    #[msg("Contract is already registered in this LoopSet")]
+    ContractAlreadyRegistered,
+    #[msg("Not all loops have been deployed yet")]
+    LoopNotFullyDeployed,
+    #[msg("Interest amount exceeds the recorded estimate by more than 10%")]
+    InvalidInterestAmount,
 }

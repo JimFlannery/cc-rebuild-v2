@@ -10,7 +10,10 @@
       "Bash(do)",
       "Bash(sed -i 's/className=\"\"flex min-h-screen flex-col items-center justify-center\\\\\\( gap-[0-9]*\\\\\\)\\\\?\"\"/className=\"\"mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-8\"\"/g' \"$f\")",
       "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2 -name schema.sql -o -name *schema* -type f)",
-      "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts/target -name *.json -path */idl/* -o -name *.json -path */types/*)"
+      "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts/target -name *.json -path */idl/* -o -name *.json -path */types/*)",
+      "Bash(python -c ':*)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:learn.swyftx.com)"
     ]
   }
 }
