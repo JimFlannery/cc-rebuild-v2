@@ -11,10 +11,14 @@ This repository is a full rebuild of [ConditionCover.com](https://conditioncover
 ## How It Works
 
 1. A **Hedge party** pays a premium and receives a payout if a specified space weather event occurs (e.g. Kp-Index ≥ 5 or Dst < −850 nT).
-2. A **Cover party** collects the premium as yield and absorbs the loss if the event occurs.
+2. A **Cover party** collects the premium as yield and absorbs the loss if the event occurs. All market contracts include **risk sharing** — cover exposure is offset automatically.
 3. A **custom oracle** polls NOAA SWPC data on a continuous basis and automatically settles the on-chain contract when a threshold is crossed or the contract expires.
 4. All collateral is held in escrow on Solana (USDC or SSTM) and transferred to the winner without manual intervention.
-5. **Yield Boost** allows Cover parties to amplify returns via delta-neutral looping — the platform treasury issues SSTM loans to fund additional looped contract pairs.
+5. **Yield Boost** provides delta-neutral income through two channels:
+   - **Community Yield Boost** — pool-based, $2,000 SSTM minimum, longer contract durations for TVL stability
+   - **Peer-to-Peer Yield Boost** — direct counterparty matching, $50,000 SSTM minimum, higher reward tiers
+   
+   Both use treasury-issued SSTM loans to create looped contract pairs that amplify returns.
 
 ---
 
@@ -43,11 +47,11 @@ cc-rebuild-v2/
 
 | Component | Status |
 |---|---|
-| Homepage (5 opportunity cards, market summary bar) | ✓ Built |
-| Markets page (order cards, sidebar filters) | ✓ Built |
-| Order detail page (`/orders/[id]` + CoverForm) | ✓ Built |
+| Homepage (two-option landing: Markets + Yield Boost) | ✓ Built |
+| Markets page (order cards, sidebar filters, risk sharing) | ✓ Built |
+| Order detail page (`/orders/[id]` + partial-fill CoverForm) | ✓ Built |
 | Hedge order creation (`/hedge`) | ✓ Built |
-| Yield Boost / Looping (`/yieldboost`) | ✓ Built |
+| Yield Boost (`/yieldboost` — Community + P2P tabs) | ✓ Built |
 | Dashboards (Market Metrics, Space Weather, Risk Management) | ✓ Built |
 | Learn page (6 lessons, YouTube embed) | ✓ Built |
 | Rewards page (SSTM tier table) | ✓ Built |
@@ -69,7 +73,7 @@ cc-rebuild-v2/
 | `register_loop_contract` — link Contract into LoopSet | ✓ Implemented |
 | `settle_loop_set` — collect interest, mark settled | ✓ Implemented |
 | Integration tests (24/24 passing on localnet) | ✓ Complete |
-| Deploy to devnet | Pending |
+| Deploy to devnet | ✓ Deployed |
 
 ### Oracle — `oracle/`
 
@@ -184,16 +188,41 @@ NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 
 ### Database Migrations
 
-Run all three migrations against `condition_cover` in MySQL CLI:
+Run all migrations against `condition_cover` in MySQL CLI:
 
 ```sql
 USE condition_cover;
 SOURCE website/scripts/migrations/001_add_loop_variables.sql;
 SOURCE website/scripts/migrations/002_add_loop_sets.sql;
 SOURCE website/scripts/migrations/003_add_yield_boost_standard.sql;
+SOURCE website/scripts/migrations/004_add_sstm_price_and_community_orders.sql;
 ```
 
-All three have been applied to the local development database as of 2026-04-02.
+Seed the first Community Yield Boost order:
+
+```sql
+SOURCE website/scripts/seed_community_order.sql;
+```
+
+All four migrations have been applied to the local development database as of 2026-04-15.
+
+### Devnet Deployment
+
+Smart contracts are deployed to Solana devnet. Run the setup script from WSL2:
+
+```bash
+cd /mnt/c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts
+bash scripts/devnet-setup.sh
+```
+
+This creates the SSTM mint, airdrops SOL, and deploys the program. Addresses are saved to `smartcontracts/scripts/devnet-addresses.txt`.
+
+| Address | Value |
+|---|---|
+| Program ID | `5PkPCbdZNFGYVJNjifxgZDGyeaMKmTeWPj4fxhYeeB9K` |
+| SSTM Mint | `GzHNybBLLxt7BcAs7ogTmD4m5Wnz8gRkwiHNpFkDY41S` |
+
+Phantom wallet must be switched to Devnet (Settings > Developer Settings).
 
 ---
 

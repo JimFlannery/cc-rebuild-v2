@@ -35,12 +35,13 @@ Each subdirectory has its own `CLAUDE.md` with component-specific guidance.
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Radix UI |
-| Blockchain | Solana (Anchor framework) |
-| Oracle | Chainlink Data Feeds (SDK v2, direct account reads) + custom off-chain adapter for NOAA SWPC data |
-| Database | MySQL (replacing DynamoDB) |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4 |
+| Blockchain | Solana (Anchor 0.32 framework) |
+| Wallet | Phantom (via `@solana/wallet-adapter-react`) |
+| Oracle | Custom off-chain adapter for NOAA SWPC data + Chainlink Data Feeds (SDK v2) |
+| Database | MySQL 8 (replacing DynamoDB) |
+| Auth | Better Auth — email/password, session management, KYC/AML hooks |
 | Space Weather Data | NOAA SWPC via MCP server at `C:\Users\jim-f\source\repos\space_weather_data_mcp` |
-| Auth | TBD (was AWS Cognito — to be decided for rebuild) |
 | Tokens | USDC (stablecoin), SSTM (platform token), SOL (gas), LINK (oracle gas) |
 
 ---

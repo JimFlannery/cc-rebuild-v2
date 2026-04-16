@@ -38,8 +38,8 @@ Two rows inside a `max-w-7xl` inner wrapper (header background stays full-width)
 **Removed from nav, now in footer:** Resources · Feedback · Invite Friends · Legal Disclaimer
 
 **Wallet dropdown** (`SUPPORTED_WALLETS` array at top of nav.tsx):
-- Not connected → "Connect Wallet" opens dropdown listing wallets with icons. Only Phantom supported now.
-- Connected → shows Phantom icon + truncated address (4…4); dropdown offers Disconnect.
+- Not connected → "Connect Wallet" opens dropdown listing wallets with icons. Only Phantom supported now. Shows "Solana Devnet" label.
+- Connected → shows Phantom icon + truncated address (4…4); dropdown offers Disconnect. Shows "Solana Devnet" label.
 - Phantom icon: `/public/Phantom_SVG_Icon.svg`
 - Adding more wallets: append to `SUPPORTED_WALLETS`.
 - **KYC gate removed for development.** The original State 2 (disabled button + tooltip) is bypassed until the KYC service is live. See Access States section below for the intended pre-launch flow.
@@ -53,85 +53,18 @@ Copyright: `© 2026 Frontier Stream, Inc. All Rights Reserved. Patent Pending.`
 
 ---
 
-## Homepage — Opportunity Cards
+## Homepage
 
-The homepage (`app/page.tsx`) is not a dashboard — it is a **market opportunity page** displaying a set of cards representing available positions. These are not live contracts but curated entry points that route the user into the order creation flow.
+The homepage (`app/page.tsx`) is a simple landing page with two clear entry points:
 
-**Market summary bar** sits above the cards showing live platform totals:
-- `Cover Supplied` — total USD value of active cover orders
-- `Cover Sought` — total USD value of active hedge orders
+1. **Supply Cover & Earn up to 17%** — links to `/markets`. All market contracts include risk sharing. No Yield Boost on market orders.
+2. **Delta Neutral Income** — links to `/yieldboost`. Both Community and P2P Yield Boost on that page.
 
-The page has two visual sections:
-- **"Earn Income by supplying cover using SSTM Token"** — Cover order cards (blue/purple)
-- **"Secure Cover Against Environmental Risk using SSTM Token"** — Hedge order card (green/yellow)
+Below the two option cards is a **platform stats bar** showing: Premiums Earned, Cover Secured, TVL (SSTM), TVL (USDC), Total Income Earned, SSTM Price. Six stats in a single row on desktop.
 
----
+Cover Supplied and Cover Sought are shown in the top nav bar, not duplicated on the homepage.
 
-### Card Anatomy (from mock-up)
-
-Each card displays:
-- **Order type label** — "Supply Cover" or "Seeking Cover"
-- **Amount** — fixed dollar amount or "Enter Amount" free-form input
-- **SSTM Reward APY** — current or projected yield (green); shows `--%` when calculated on entry
-- **Premium Earned / Premium %** — fractional token premium (green)
-- **Contract Length** — days
-- **Risk of Cover Payout / Probability of Cover Payout** — annual payout probability (red)
-- **Option checkboxes** — vary by card (see per-card details below)
-- **Countdown timer** — "Risk Sharing Offer Expires in DD:HH:MM:SS" (purple badge) — shown on time-limited offers
-- **CTA button** — "Review / Customize Order"
-
-Color coding:
-- Green — income/reward values (APY, premium earned)
-- Red — risk values (payout probability)
-- Purple badge — countdown timer on expiring offers
-
----
-
-### The Five Cards
-
-**Card 1 — Maximum Tier Cover (fixed amount)**
-- Type: Supply Cover
-- Amount: pre-filled (e.g. $1,000,000) — the amount needed to reach the maximum SSTM reward tier
-- SSTM Reward APY: maximum tier rate (e.g. 17%), labeled "(Max 17%)"
-- Options: Offset Risk checkbox, Offset Yield Boost checkbox ("Up to 8%")
-- Countdown timer: shown (time-limited risk-sharing offer)
-- Purpose: one-click entry for users who want maximum APY by supplying the full top-tier amount
-
-**Card 2 — Next Tier Cover (fixed amount)**
-- Type: Supply Cover
-- Amount: pre-filled — the incremental amount needed to reach the *next* rewards tier from the user's current position
-- SSTM Reward APY: next tier rate (e.g. 10%), labeled "(Max 17%)"
-- Options: Offset Risk checkbox, Offset Yield Boost checkbox ("Up to 8%")
-- Countdown timer: shown
-- Purpose: personalised nudge showing exactly how much more coverage earns the user a tier upgrade
-
-**Card 3 — Free Form Cover**
-- Type: Supply Cover
-- Amount: "Enter Amount" free-form input
-- SSTM Reward APY: calculated dynamically based on entered amount and current tier (`---%` until entered)
-- Options: Reduce Risk Option checkbox, Yield Amplifier Option checkbox
-- No countdown timer
-- Purpose: flexible entry for any cover amount; system finds the best matching APY tier
-
-**Card 4 — Delta Neutral (One-Click)**
-- Type: Supply Cover (with simultaneous Hedge)
-- Amount: pre-filled — matches an existing open opportunity (e.g. $150,000)
-- SSTM Reward APY: full looping tier rate (e.g. 10%)
-- Options: Offset Risk checkbox, Offset Yield Boost checkbox ("Up to 8%")
-- Countdown timer: shown
-- Purpose: creates (or matches) both a Cover order and a Hedge order with identical parameters in one action, resulting in a delta-neutral position with zero net risk; qualifies user for full looping APY tier rewards. Looping management handled within `/yieldboost`.
-
-**Card 5 — Free Form Hedge**
-- Type: Seeking Cover (Hedge order)
-- Amount: "Enter Amount" free-form input
-- Premium %: shown (e.g. 1.2%)
-- Contract Length: shown
-- Cover Payout Trigger: the index threshold displayed as a clickable link (e.g. "DST > -800nT")
-- Probability of Cover Payout: annual probability (red)
-- Cost to Enter: "Calculated" — computed from entered amount and current oracle gas fees
-- No countdown timer, no offset checkboxes
-- Background color: green/yellow (visually distinct from cover cards)
-- Purpose: free-form hedge entry; user specifies dollar amount and system calculates cost and trigger
+The old five-card layout (`HomeCards.tsx`) is retained for reference but no longer imported. A future "Featured Opportunities" section may link directly to active orders.
 
 ---
 
@@ -139,18 +72,19 @@ Color coding:
 
 | Route | Status | Notes |
 |---|---|---|
-| `/` | Stub | Shows MySQL connection status |
-| `/markets` | Stub | |
+| `/` | **Built** | Two-option landing page + platform stats |
+| `/markets` | **Built** | Order cards, sidebar filters, risk sharing (no Yield Boost) |
+| `/orders/[id]` | **Built** | Order detail + partial-fill CoverForm with progress bar |
 | `/dashboards` | **Built** | See Dashboards section below |
-| `/yieldboost` | Stub | |
+| `/yieldboost` | **Built** | Open Orders (Community + P2P columns) and Place P2P Order tabs |
 | `/hedge` | **Built** | Full order creation; see Hedge section below |
-| `/learn` | Stub | Nav label is "Learn-to-Earn"; path stays `/learn` |
+| `/learn` | **Built** | 6 lessons, YouTube embed; nav label is "Learn-to-Earn" |
 | `/rewards` | **Built** | Token Rewards content from prototype (no Points, no images) |
 | `/resources` | Stub | Link moved to footer |
 | `/feedback` | Stub | Link moved to footer |
 | `/profile` | Stub | |
 | `/notifications` | Stub | |
-| `/orders` | Stub | |
+| `/orders` | Stub | Order list page |
 | `/contracts` | Stub | |
 | `/invite` | Stub | Link in footer |
 | `/legal` | **Built** | Full disclaimer from prototype sidebar popup |
@@ -177,7 +111,7 @@ Spec: `app/hedge/CLAUDE.md`
 
 **Post on-chain:** Writes to MySQL `Orders` via `createHedgeOrder` server action.
 
-**SSTM mint placeholder:** `lib/orderConstants.ts` `MINT_ADDRESSES.SSTM` — replace before devnet SSTM testing.
+**SSTM mint:** `lib/orderConstants.ts` `MINT_ADDRESSES.SSTM` = `GzHNybBLLxt7BcAs7ogTmD4m5Wnz8gRkwiHNpFkDY41S` (devnet).
 
 ### `/dashboards` — Platform & Risk Dashboards
 
@@ -189,6 +123,38 @@ Spec: `app/hedge/CLAUDE.md`
 1. **Market Metrics** — Cover Supply/Demand, Premiums Earned, Cover Secured, TVL (SSTM + USDC). Single aggregate SQL query. Coverage stored as USD — no token price conversion.
 2. **Space Weather** — Kp Forecast, Mid/High-Latitude storm probability grids, Dst card. All values `—` pending MCP integration. Educational tooltips present.
 3. **Risk Management** — My Cover Supplied, Offsetting Contracts (Delta Neutral %), Offsetting Orders (pending), Unmitigated Cover at Risk. Filtered by `WalletAddress`. Shows connect prompt if not connected.
+
+### `/yieldboost` — Yield Boost (Delta Neutral Income)
+
+**Files:**
+- `app/yieldboost/page.tsx` — Server component; fetches settings, prices, open orders, tiers.
+- `app/yieldboost/YieldBoostPage.tsx` — Client component; tabs, forms, matching logic.
+
+**Two tabs:**
+1. **Open Orders** (default) — two-column layout:
+   - **Community Orders** (left) — pool-based, $2,000 SSTM minimum, 2 loops, longer durations. Displays as a card with progress bar (coverage sought/filled). "Join Pool" opens modal with amount input, min/max validation, acknowledgement checkbox.
+   - **Peer-to-Peer Orders** (right) — direct matching, $50,000 SSTM minimum. Table with Counterparty, Coverage, Loops, Contract, APY, Expires, Match button.
+2. **Place P2P Order** — full order form with coverage input ($50k min enforced), loops slider, contract/order duration, yield projections panel.
+
+**Key design decisions:**
+- Yield Boost is completely separate from Markets. No Yield Boost badges/options on market orders.
+- Community orders are seeded by the platform (`IsCommunityOrder = 1`); plan to auto-create new ones when each successive order closes.
+- SSTM price is locked at order creation time (`SSTMPriceAtCreation`). Tier calculations use this locked price, not current market price.
+- Community Yield Boost uses longer contract durations than Markets to stabilize TVL and justify higher returns.
+
+### `/orders/[id]` — Order Detail + Partial-Fill Cover
+
+**Files:**
+- `app/orders/[id]/page.tsx` — Server component; fetches order, tiers, prices.
+- `app/orders/[id]/CoverForm.tsx` — Client component; coverage amount input, on-chain submission, partial fills.
+
+**Partial fill flow:**
+- User enters coverage amount ($10 minimum, capped at remaining unfilled amount).
+- Progress bar shows coverage filled vs. sought.
+- "Fill remaining" shortcut link.
+- Tier/APY calculated on collective coverage (already filled + new contribution).
+- On submit: on-chain `create_order` (Cover type), MySQL `createCoverOrder`, then `updateCoverageFilled`.
+- When `CoverageFilled >= Coverage`, order is closed (`OrderTaken = 1, Status = 'Matched'`).
 
 ### `/rewards`
 Token Rewards section from prototype. Tier table (Tiers 1–5, 7–17% APY). No Points. No images.
@@ -205,7 +171,17 @@ Full legal disclaimer from prototype sidebar popup. All sections: General, No Ad
 | `testDb.ts` | DB connection test |
 | `prices.ts` | Jupiter Price API v6 for SOL/USDC/LINK; SSTM hardcoded at $9.024; 60 s in-memory cache; falls back to hardcoded constants |
 | `getTiers.ts` | Reads `Tiers` table. **Only `async` exports allowed** (`'use server'` constraint) |
-| `createHedgeOrder.ts` | Inserts row into `Orders` after successful on-chain `create_order` |
+| `createHedgeOrder.ts` | Inserts Hedge row into `Orders`; records `SSTMPriceAtCreation` |
+| `createCoverOrder.ts` | Inserts Cover row into `Orders`; links via `MatchingOrderID`; records `SSTMPriceAtCreation` |
+| `createLoopOrder.ts` | Inserts P2P Yield Boost loop order; records `SSTMPriceAtCreation` |
+| `createCommunityOrder.ts` | Seeds a Community Yield Boost pool order (`IsCommunityOrder = 1`) |
+| `updateCoverageFilled.ts` | Increments `CoverageFilled` on a hedge order; closes it when fully filled |
+| `getOpenHedgeOrders.ts` | Fetches open hedge orders for Markets; supports filters; includes `coverageFilled` |
+| `getOrderById.ts` | Single order fetch for `/orders/[id]` detail page |
+| `getOpenLoopOrders.ts` | Fetches open Yield Boost orders; returns `isCommunityOrder`, `coverageSought`, `coverageFilled` |
+| `getLoopSettings.ts` | Reads looping config from `VariableSettings` (APY, LTV, fees, max loops) |
+| `matchLoopOrder.ts` | Records P2P loop match in MySQL (LoopSets + contract pairs) |
+| `getHomePageData.ts` | Order-matching queries for homepage featured opportunities (retained, not currently used) |
 | `getDashboardMetrics.ts` | `getMarketMetrics()` — platform aggregate. `getUserRiskMetrics(walletAddress)` — user-specific risk stats |
 
 **Rule:** Every export from a `'use server'` file must be `async`. Pure helpers go in `lib/`.
@@ -270,7 +246,10 @@ These routes exist in the prototype at `C:\Users\jim-f\source\repos\next-js` and
 ### Solana Wallet
 - Auth and identity are tied to a Solana wallet (replacing AWS Cognito).
 - `WalletAddress` on the `Orders` and `Contracts` tables is the primary user identifier.
-- Wallet adapter library TBD (standard choice: `@solana/wallet-adapter-react`).
+- Wallet adapter: `@solana/wallet-adapter-react` with Phantom adapter. Configured in `components/wallet-provider.tsx`.
+- Currently targeting **Solana devnet**. Wallet dropdown shows "Solana Devnet" label.
+- Program ID: `5PkPCbdZNFGYVJNjifxgZDGyeaMKmTeWPj4fxhYeeB9K`
+- SSTM Mint: `GzHNybBLLxt7BcAs7ogTmD4m5Wnz8gRkwiHNpFkDY41S` (defined in `lib/orderConstants.ts`)
 
 ### Chainlink Oracle
 - Contract settlement is automatic — the frontend does not trigger settlement.
