@@ -8,11 +8,14 @@ skip-lint = false
 [programs.localnet]
 condition_cover = "5PkPCbdZNFGYVJNjifxgZDGyeaMKmTeWPj4fxhYeeB9K"
 
+[programs.devnet]
+condition_cover = "5PkPCbdZNFGYVJNjifxgZDGyeaMKmTeWPj4fxhYeeB9K"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [test]

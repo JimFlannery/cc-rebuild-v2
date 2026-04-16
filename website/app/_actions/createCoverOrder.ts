@@ -3,30 +3,31 @@
 import pool from '@/lib/db';
 import { getTokenPrices } from './prices';
 
-export interface CreateHedgeOrderInput {
+export interface CreateCoverOrderInput {
   orderTiming: 'Market' | 'Committed';
   orderDuration: number | null;
-  expirationDate: string | null;       // ISO timestamp
-  formattedExpiration: string | null;  // 'DD Mon YYYY 11:59 PM'
+  expirationDate: string | null;
+  formattedExpiration: string | null;
   currency: 'USDC' | 'SSTM';
   contractDuration: number;
-  indexName: string;                   // 'Disturbance Storm Time' | 'Planetary K-Index'
+  indexName: string;
   indexLevel: number;
   indexUnit: string;
   payoutProbability: number;
-  coverage: number;                    // dollar amount
-  hedgePremium: number;                // base premium in token units
+  coverage: number;
+  hedgePremium: number;
   hedgePremiumAdjustment: number;
   adjustedHedgePremium: number;
   serviceFee: number;
   totalServiceFees: number;
-  gasFeeLayer1: number;                // SOL amount
+  gasFeeLayer1: number;
   walletAddress: string;
   orderAddress: string;
   denominationAddress: string;
+  matchingOrderID?: string;        // the hedge order being covered
 }
 
-export async function createHedgeOrder(input: CreateHedgeOrderInput): Promise<void> {
+export async function createCoverOrder(input: CreateCoverOrderInput): Promise<void> {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const prices = await getTokenPrices();
 
@@ -42,10 +43,11 @@ export async function createHedgeOrder(input: CreateHedgeOrderInput): Promise<vo
       GasFeeLayer1, GasFeeOracle,
       WalletAddress, OrderAddress, DenominationAddress,
       SSTMPriceAtCreation,
+      MatchingOrderID,
       MOS, MOStype,
       createdAt, updatedAt
     ) VALUES (
-      'Hedge', 'Open', ?,
+      'Cover', 'Open', ?,
       ?, ?, ?, ?,
       ?, ?, 1,
       ?, ?, ?,
@@ -54,6 +56,7 @@ export async function createHedgeOrder(input: CreateHedgeOrderInput): Promise<vo
       ?, ?,
       ?, 0,
       ?, ?, ?,
+      ?,
       ?,
       0, NULL,
       ?, ?
@@ -81,6 +84,7 @@ export async function createHedgeOrder(input: CreateHedgeOrderInput): Promise<vo
       input.orderAddress,
       input.denominationAddress,
       prices.SSTM,
+      input.matchingOrderID ?? null,
       now,
       now,
     ]

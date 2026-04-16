@@ -284,16 +284,9 @@ function OrderCard({
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {shortIndex(order.indexName)}
         </span>
-        <div className="flex items-center gap-2">
-          {order.yieldBoostEligible && (
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-              Yield Boost ✦
-            </span>
-          )}
-          <span className="text-xs font-medium text-muted-foreground">
-            {order.denomination}
-          </span>
-        </div>
+        <span className="text-xs font-medium text-muted-foreground">
+          {order.denomination}
+        </span>
       </div>
 
       {/* Body */}

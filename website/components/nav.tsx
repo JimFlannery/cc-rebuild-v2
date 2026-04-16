@@ -152,6 +152,7 @@ export function Nav({ coverSupply = 0, coverDemand = 0 }: { coverSupply?: number
 
                 {walletMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-popover py-1 shadow-lg z-50">
+                    <p className="px-4 py-1.5 text-xs text-amber-500 font-medium">Solana Devnet</p>
                     {!connected && (
                       <>
                         <p className="px-4 py-1.5 text-xs text-muted-foreground">Select wallet</p>

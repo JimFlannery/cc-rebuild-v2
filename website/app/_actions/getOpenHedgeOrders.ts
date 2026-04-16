@@ -10,6 +10,7 @@ export interface OpenHedgeOrder {
   indexUnit: string;
   payoutProbability: number;
   coverage: number;
+  coverageFilled: number;
   hedgePremium: number;
   adjustedHedgePremium: number;
   denomination: string;
@@ -17,8 +18,9 @@ export interface OpenHedgeOrder {
   expiration: string | null;
   formattedExpiration: string | null;
   coverRewardAPY: number | null;
-  yieldBoostEligible: boolean;
   createdAt: string;
+  orderTaken?: boolean;
+  status?: string;
 }
 
 export interface HedgeOrderFilters {
@@ -86,7 +88,6 @@ export async function getOpenHedgeOrders(
 
   const where = conditions.join(" AND ");
 
-  // Fetch orders + yield boost threshold in one query
   const [rows] = await pool.query(
     `SELECT
        o.id, o.WalletAddress AS walletAddress,
@@ -101,10 +102,9 @@ export async function getOpenHedgeOrders(
        o.Expiration AS expiration,
        o.FormattedExpiration AS formattedExpiration,
        o.CoverRewardAPY AS coverRewardAPY,
-       o.createdAt,
-       COALESCE(v.YieldBoostMinCoverage, 2000) AS yieldBoostMin
+       COALESCE(o.CoverageFilled, 0) AS coverageFilled,
+       o.createdAt
      FROM Orders o
-     LEFT JOIN (SELECT YieldBoostMinCoverage FROM VariableSettings ORDER BY createdAt DESC LIMIT 1) v ON 1=1
      WHERE ${where}
      ORDER BY o.createdAt DESC`,
     params
@@ -118,6 +118,7 @@ export async function getOpenHedgeOrders(
     indexUnit: r.indexUnit,
     payoutProbability: Number(r.payoutProbability),
     coverage: Number(r.coverage),
+    coverageFilled: Number(r.coverageFilled),
     hedgePremium: Number(r.hedgePremium),
     adjustedHedgePremium: Number(r.adjustedHedgePremium),
     denomination: r.denomination,
@@ -125,7 +126,6 @@ export async function getOpenHedgeOrders(
     expiration: r.expiration,
     formattedExpiration: r.formattedExpiration,
     coverRewardAPY: r.coverRewardAPY != null ? Number(r.coverRewardAPY) : null,
-    yieldBoostEligible: r.denomination === 'SSTM' && Number(r.coverage) >= Number(r.yieldBoostMin),
     createdAt: r.createdAt,
   }));
 

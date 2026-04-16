@@ -13,6 +13,9 @@ export interface OpenLoopOrder {
   expiration: string | null;
   formattedExpiration: string | null;
   createdAt: string;
+  isCommunityOrder: boolean;
+  coverageSought: number | null;
+  coverageFilled: number | null;
 }
 
 export async function getOpenLoopOrders(): Promise<OpenLoopOrder[]> {
@@ -27,7 +30,10 @@ export async function getOpenLoopOrders(): Promise<OpenLoopOrder[]> {
        ServiceFee           AS upfrontFeeUsd,
        Expiration           AS expiration,
        FormattedExpiration  AS formattedExpiration,
-       createdAt
+       createdAt,
+       COALESCE(IsCommunityOrder, 0) AS isCommunityOrder,
+       CoverageSought       AS coverageSought,
+       CoverageFilled       AS coverageFilled
      FROM Orders
      WHERE IsLoopOrder = 1
        AND Status = 'Open'
@@ -35,5 +41,10 @@ export async function getOpenLoopOrders(): Promise<OpenLoopOrder[]> {
        AND (Expiration IS NULL OR Expiration > NOW())
      ORDER BY createdAt DESC`
   );
-  return rows as OpenLoopOrder[];
+  return (rows as any[]).map((r) => ({
+    ...r,
+    isCommunityOrder: !!r.isCommunityOrder,
+    coverageSought: r.coverageSought != null ? Number(r.coverageSought) : null,
+    coverageFilled: r.coverageFilled != null ? Number(r.coverageFilled) : null,
+  }));
 }

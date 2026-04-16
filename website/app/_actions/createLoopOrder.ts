@@ -1,6 +1,7 @@
 'use server';
 
 import pool from '@/lib/db';
+import { getTokenPrices } from './prices';
 
 export interface CreateLoopOrderInput {
   coverageUsd: number;
@@ -19,6 +20,7 @@ export interface CreateLoopOrderInput {
 
 export async function createLoopOrder(input: CreateLoopOrderInput): Promise<{ id: string }> {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const prices = await getTokenPrices();
 
   const [result] = await pool.execute(
     `INSERT INTO Orders (
@@ -29,6 +31,7 @@ export async function createLoopOrder(input: CreateLoopOrderInput): Promise<{ id
       Coverage, CoverRewardAPY,
       ServiceFee, TotalServiceFees,
       WalletAddress,
+      SSTMPriceAtCreation,
       IsLoopOrder, LoopNumLoops,
       MOS, MOStype,
       createdAt, updatedAt
@@ -39,6 +42,7 @@ export async function createLoopOrder(input: CreateLoopOrderInput): Promise<{ id
       'Disturbance Storm Time', -850, 'nT', 0.012,
       ?, ?,
       ?, ?,
+      ?,
       ?,
       1, ?,
       0, NULL,
@@ -55,6 +59,7 @@ export async function createLoopOrder(input: CreateLoopOrderInput): Promise<{ id
       input.upfrontFeeUsd,
       input.upfrontFeeUsd,
       input.walletAddress,
+      prices.SSTM,
       input.numLoops,
       now,
       now,

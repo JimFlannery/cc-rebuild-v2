@@ -50,7 +50,8 @@ function formatDate(date: Date): string {
   return `${d} ${months[date.getMonth()]} ${date.getFullYear()} ${h12}:${m} ${ampm}`;
 }
 
-function shortWallet(address: string): string {
+function shortWallet(address: string | null): string {
+  if (!address) return "Platform";
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
@@ -99,13 +100,13 @@ function pct(n: number, decimals = 2): string {
 // ── Main component ───────────────────────────────────────────────────────────
 
 export function YieldBoostPage({ settings, prices, openOrders, tiers }: Props) {
-  const [tab, setTab] = useState<"create" | "open">("create");
+  const [tab, setTab] = useState<"open" | "create">("open");
 
   return (
     <div className="space-y-6">
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-border">
-        {(["create", "open"] as const).map((t) => (
+        {(["open", "create"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -116,16 +117,16 @@ export function YieldBoostPage({ settings, prices, openOrders, tiers }: Props) {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
-            {t === "create" ? "Place Order" : `Open Orders${openOrders.length > 0 ? ` (${openOrders.length})` : ""}`}
+            {t === "open" ? `Open Orders${openOrders.length > 0 ? ` (${openOrders.length})` : ""}` : "Place P2P Order"}
           </button>
         ))}
       </div>
 
-      {tab === "create" && (
-        <CreateOrderForm settings={settings} prices={prices} tiers={tiers} />
-      )}
       {tab === "open" && (
         <OpenOrdersTable orders={openOrders} settings={settings} />
+      )}
+      {tab === "create" && (
+        <CreateOrderForm settings={settings} prices={prices} tiers={tiers} />
       )}
     </div>
   );
@@ -170,7 +171,7 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
     const e: Record<string, boolean> = {};
     if (!contractDuration) e.contractDuration = true;
     if (!orderDurationDays && !orderDurationHours) e.orderDuration = true;
-    if (coverageNum <= 0) e.coverage = true;
+    if (coverageNum < P2P_MIN_USD) e.coverage = true;
     if (!acknowledged) e.acknowledged = true;
     return e;
   }
@@ -263,6 +264,9 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">Currency: SSTM &nbsp;·&nbsp; ≈ {Math.round(coverageNum / prices.SSTM).toLocaleString("en-US")} tokens at current price</p>
+              {fieldErrors.coverage && coverageNum > 0 && coverageNum < P2P_MIN_USD && (
+                <p className="text-xs text-red-500 mt-1">Minimum coverage for P2P orders is ${P2P_MIN_USD.toLocaleString("en-US")}</p>
+              )}
             </div>
 
             <hr className="border-border mx-6" />
@@ -544,6 +548,157 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
 
 // ── Open Orders Table ─────────────────────────────────────────────────────────
 
+const COMMUNITY_MIN_USD = 2_000;
+const P2P_MIN_USD = 50_000;
+
+function CommunityOrderColumn({
+  orders, connected, onMatch, emptyMessage,
+}: {
+  orders: OpenLoopOrder[];
+  connected: boolean;
+  onMatch: (o: OpenLoopOrder) => void;
+  emptyMessage: string;
+}) {
+  if (orders.length === 0) {
+    return (
+      <div className="rounded-lg border border-border px-6 py-10 text-center">
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {orders.map((order) => {
+        const sought = order.coverageSought ?? 0;
+        const filled = order.coverageFilled ?? 0;
+        const remaining = Math.max(0, sought - filled);
+        const pctFilled = sought > 0 ? (filled / sought) * 100 : 0;
+
+        return (
+          <div key={order.id} className="rounded-lg border border-border p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Community Pool</span>
+              <span className="text-xs text-muted-foreground">{order.contractDuration}-day contracts</span>
+            </div>
+
+            {/* Progress bar */}
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-muted-foreground">Coverage Filled</span>
+                <span className="font-medium">{usd(filled)} / {usd(sought)}</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${Math.min(100, pctFilled)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {usd(remaining)} remaining &nbsp;·&nbsp; {pctFilled.toFixed(1)}% filled
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Minimum</span>
+                <span className="font-medium">${COMMUNITY_MIN_USD.toLocaleString("en-US")} SSTM</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Contract</span>
+                <span className="font-medium">{order.contractDuration} days</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Order Expires</span>
+                <span className="font-medium">{order.formattedExpiration ?? "—"}</span>
+              </div>
+            </div>
+
+            <button
+              disabled={!connected || remaining <= 0}
+              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+              title={!connected ? "Connect wallet to participate" : remaining <= 0 ? "Pool is full" : "Join this community pool"}
+              onClick={() => onMatch(order)}
+            >
+              {remaining <= 0 ? "Pool Full" : "Join Pool"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function P2POrderColumn({
+  orders, myWallet, connected, settings, onMatch, emptyMessage,
+}: {
+  orders: OpenLoopOrder[];
+  myWallet: string;
+  connected: boolean;
+  settings: LoopSettings;
+  onMatch: (o: OpenLoopOrder) => void;
+  emptyMessage: string;
+}) {
+  if (orders.length === 0) {
+    return (
+      <div className="rounded-lg border border-border px-6 py-10 text-center">
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-gray-200 dark:bg-gray-800 text-left">
+            <th className="px-3 py-2 font-medium">Counterparty</th>
+            <th className="px-3 py-2 font-medium">Coverage</th>
+            <th className="px-3 py-2 font-medium">Loops</th>
+            <th className="px-3 py-2 font-medium">Contract</th>
+            <th className="px-3 py-2 font-medium">APY</th>
+            <th className="px-3 py-2 font-medium">Expires</th>
+            <th className="px-3 py-2 font-medium" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {orders.map((order) => {
+            const isOwn = order.walletAddress === myWallet;
+            const proj = calcProjections(order.coverageUsd, order.numLoops, settings);
+            return (
+              <tr key={order.id} className={cn("hover:bg-accent/30 transition-colors", isOwn && "opacity-50")}>
+                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                  {shortWallet(order.walletAddress)}
+                  {isOwn && <span className="ml-1 text-primary">(you)</span>}
+                </td>
+                <td className="px-3 py-2.5 text-xs">{usd(order.coverageUsd)}</td>
+                <td className="px-3 py-2.5 text-xs">{order.numLoops}</td>
+                <td className="px-3 py-2.5 text-xs">{order.contractDuration}d</td>
+                <td className="px-3 py-2.5 text-xs text-green-600 dark:text-green-400 font-medium">
+                  {proj ? pct(proj.effectiveAPY) : "—"}
+                </td>
+                <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                  {order.formattedExpiration ?? "—"}
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  <button
+                    disabled={isOwn || !connected}
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+                    title={isOwn ? "This is your order" : !connected ? "Connect wallet to match" : "Match this order"}
+                    onClick={() => onMatch(order)}
+                  >
+                    Match
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settings: LoopSettings }) {
   const { connected, publicKey } = useWallet();
   const anchorWallet = useAnchorWallet();
@@ -553,6 +708,9 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
   const [matchTarget, setMatchTarget] = useState<OpenLoopOrder | null>(null);
   const [matching, setMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<{ ok: boolean; error?: string } | null>(null);
+
+  const communityOrders = orders.filter((o) => o.isCommunityOrder);
+  const p2pOrders = orders.filter((o) => !o.isCommunityOrder);
 
   async function handleConfirmMatch(order: OpenLoopOrder) {
     setMatching(true);
@@ -742,64 +900,43 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
     }
   }
 
-  if (orders.length === 0) {
-    return (
-      <div className="rounded-lg border border-border px-8 py-12 text-center">
-        <p className="text-sm text-muted-foreground">No open loop orders right now.</p>
-        <p className="text-xs text-muted-foreground mt-1">Be the first — place an order and your counterparty will find you here.</p>
-      </div>
-    );
-  }
-
   return (
     <>
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-200 dark:bg-gray-800 text-left">
-              <th className="px-4 py-2.5 font-medium">Counterparty</th>
-              <th className="px-4 py-2.5 font-medium">Coverage</th>
-              <th className="px-4 py-2.5 font-medium">Loops</th>
-              <th className="px-4 py-2.5 font-medium">Contract</th>
-              <th className="px-4 py-2.5 font-medium">Effective APY</th>
-              <th className="px-4 py-2.5 font-medium">Order Expires</th>
-              <th className="px-4 py-2.5 font-medium" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {orders.map((order) => {
-              const isOwn = order.walletAddress === myWallet;
-              const proj = calcProjections(order.coverageUsd, order.numLoops, settings);
-              return (
-                <tr key={order.id} className={cn("hover:bg-accent/30 transition-colors", isOwn && "opacity-50")}>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {shortWallet(order.walletAddress)}
-                    {isOwn && <span className="ml-1 text-primary">(you)</span>}
-                  </td>
-                  <td className="px-4 py-3">{usd(order.coverageUsd)}</td>
-                  <td className="px-4 py-3">{order.numLoops}</td>
-                  <td className="px-4 py-3">{order.contractDuration}d</td>
-                  <td className="px-4 py-3 text-green-600 dark:text-green-400 font-medium">
-                    {proj ? pct(proj.effectiveAPY) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {order.formattedExpiration ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      disabled={isOwn || !connected}
-                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
-                      title={isOwn ? "This is your order" : !connected ? "Connect wallet to match" : "Match this order"}
-                      onClick={() => { setMatchTarget(order); setMatchResult(null); }}
-                    >
-                      Match
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* ── Community Orders (left) ─────────────────────────────────────── */}
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">Community Orders</h3>
+            <p className="text-xs text-muted-foreground">
+              Pool-based delta neutral &nbsp;·&nbsp; ${COMMUNITY_MIN_USD.toLocaleString("en-US")} SSTM minimum
+            </p>
+          </div>
+          <CommunityOrderColumn
+            orders={communityOrders}
+            connected={connected}
+            onMatch={(o) => { setMatchTarget(o); setMatchResult(null); }}
+            emptyMessage="No community orders currently available."
+          />
+        </div>
+
+        {/* ── Peer-to-Peer Orders (right) ─────────────────────────────────── */}
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">Peer-to-Peer Orders</h3>
+            <p className="text-xs text-muted-foreground">
+              Direct matching, higher tiers &nbsp;·&nbsp; ${P2P_MIN_USD.toLocaleString("en-US")} SSTM minimum
+            </p>
+          </div>
+          <P2POrderColumn
+            orders={p2pOrders}
+            myWallet={myWallet}
+            connected={connected}
+            settings={settings}
+            onMatch={(o) => { setMatchTarget(o); setMatchResult(null); }}
+            emptyMessage="No peer-to-peer orders yet. Be the first — place an order and your counterparty will find you here."
+          />
+        </div>
       </div>
 
       {/* Match result banner */}
@@ -817,8 +954,8 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
         </div>
       )}
 
-      {/* Match confirmation modal */}
-      {matchTarget && (() => {
+      {/* Match confirmation modal — P2P orders */}
+      {matchTarget && !matchTarget.isCommunityOrder && (() => {
         const proj = calcProjections(matchTarget.coverageUsd, matchTarget.numLoops, settings);
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -861,7 +998,129 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
           </div>
         );
       })()}
+
+      {/* Join Pool modal — Community orders */}
+      {matchTarget && matchTarget.isCommunityOrder && (
+        <CommunityJoinModal
+          order={matchTarget}
+          settings={settings}
+          onClose={() => { setMatchTarget(null); setMatchResult(null); }}
+          onConfirm={(amount) => {
+            // Override the order's coverage with the user's contribution for the match flow
+            handleConfirmMatch({ ...matchTarget, coverageUsd: amount, numLoops: settings.LoopDefaultLoops });
+          }}
+          matching={matching}
+        />
+      )}
     </>
+  );
+}
+
+// ── Community Join Modal ─────────────────────────────────────────────────────
+
+function CommunityJoinModal({
+  order, settings, onClose, onConfirm, matching,
+}: {
+  order: OpenLoopOrder;
+  settings: LoopSettings;
+  onClose: () => void;
+  onConfirm: (amountUsd: number) => void;
+  matching: boolean;
+}) {
+  const [amount, setAmount] = useState("");
+  const amountNum = Math.max(0, parseInt(amount.replace(/,/g, ""), 10) || 0);
+
+  const sought = order.coverageSought ?? 0;
+  const filled = order.coverageFilled ?? 0;
+  const remaining = Math.max(0, sought - filled);
+
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const tooLow = amountNum > 0 && amountNum < COMMUNITY_MIN_USD;
+  const tooHigh = amountNum > remaining;
+  const isValid = amountNum >= COMMUNITY_MIN_USD && amountNum <= remaining && acknowledged;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="w-full max-w-sm rounded-xl bg-background border border-border p-6 shadow-2xl space-y-4">
+        <h3 className="text-base font-semibold">Join Community Pool</h3>
+        <p className="text-xs text-muted-foreground">
+          Enter the amount of SSTM coverage you want to contribute to this community pool.
+          Your position will be delta neutral with looping managed automatically.
+        </p>
+
+        <div className="space-y-2 text-sm">
+          <SummaryRow label="Pool Seeking" value={usd(sought)} />
+          <SummaryRow label="Already Filled" value={usd(filled)} />
+          <SummaryRow label="Remaining" value={usd(remaining)} />
+          <SummaryRow label="Contract Duration" value={`${order.contractDuration} days`} />
+        </div>
+
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Your Contribution ($)</label>
+          <div className="relative w-full">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none">$</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={amountNum > 0 ? amountNum.toLocaleString("en-US") : ""}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/,/g, "");
+                if (/^\d*$/.test(raw)) setAmount(raw);
+              }}
+              placeholder={COMMUNITY_MIN_USD.toLocaleString("en-US")}
+              className={cn(
+                "w-full rounded-md border border-border bg-background pl-7 pr-3 py-2 text-sm",
+                (tooLow || tooHigh) && "ring-2 ring-red-500"
+              )}
+            />
+          </div>
+          {tooLow && (
+            <p className="text-xs text-red-500 mt-1">
+              Minimum contribution is ${COMMUNITY_MIN_USD.toLocaleString("en-US")}
+            </p>
+          )}
+          {tooHigh && (
+            <p className="text-xs text-red-500 mt-1">
+              Exceeds remaining capacity of {usd(remaining)}
+            </p>
+          )}
+        </div>
+
+        <label className="flex items-start gap-2 text-xs cursor-pointer">
+          <input
+            type="checkbox"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+            className="mt-0.5 accent-primary shrink-0"
+          />
+          <span>
+            I understand that joining this pool locks my SSTM tokens in a delta neutral
+            looping position for the full contract duration and agree to the{" "}
+            <a href="/legal" className="underline" target="_blank" rel="noopener noreferrer">
+              terms and legal disclaimer
+            </a>.
+          </span>
+        </label>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            disabled={matching}
+            className="flex-1 rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(amountNum)}
+            disabled={matching || !isValid}
+            className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {matching ? "Deploying…" : "Confirm & Join"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -88,7 +88,7 @@ export const INDEX_NAME_TO_ANCHOR = {
 // SSTM: placeholder until the token is deployed on devnet/mainnet.
 export const MINT_ADDRESSES = {
   USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  SSTM: "SSTMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", // TODO: replace with actual mint
+  SSTM: "GzHNybBLLxt7BcAs7ogTmD4m5Wnz8gRkwiHNpFkDY41S",
 } as const;
 
 export const TOKEN_DECIMALS = 6;

@@ -11,6 +11,7 @@ export async function getOrderById(id: string): Promise<OpenHedgeOrder | null> {
        o.IndexUnit AS indexUnit,
        o.PayoutProbability AS payoutProbability,
        o.Coverage AS coverage,
+       COALESCE(o.CoverageFilled, 0) AS coverageFilled,
        o.HedgePremium AS hedgePremium,
        o.AdjustedHedgePremium AS adjustedHedgePremium,
        o.Denomination AS denomination,
@@ -20,10 +21,8 @@ export async function getOrderById(id: string): Promise<OpenHedgeOrder | null> {
        o.CoverRewardAPY AS coverRewardAPY,
        o.Status AS status,
        o.OrderTaken AS orderTaken,
-       o.createdAt,
-       COALESCE(v.YieldBoostMinCoverage, 2000) AS yieldBoostMin
+       o.createdAt
      FROM Orders o
-     LEFT JOIN (SELECT YieldBoostMinCoverage FROM VariableSettings ORDER BY createdAt DESC LIMIT 1) v ON 1=1
      WHERE o.id = ?
        AND o.OrderType = 'Hedge'
        AND (o.IsLoopOrder = 0 OR o.IsLoopOrder IS NULL)`,
@@ -41,6 +40,7 @@ export async function getOrderById(id: string): Promise<OpenHedgeOrder | null> {
     indexUnit: r.indexUnit,
     payoutProbability: Number(r.payoutProbability),
     coverage: Number(r.coverage),
+    coverageFilled: Number(r.coverageFilled),
     hedgePremium: Number(r.hedgePremium),
     adjustedHedgePremium: Number(r.adjustedHedgePremium),
     denomination: r.denomination,
@@ -48,7 +48,8 @@ export async function getOrderById(id: string): Promise<OpenHedgeOrder | null> {
     expiration: r.expiration,
     formattedExpiration: r.formattedExpiration,
     coverRewardAPY: r.coverRewardAPY != null ? Number(r.coverRewardAPY) : null,
-    yieldBoostEligible: r.denomination === 'SSTM' && Number(r.coverage) >= Number(r.yieldBoostMin),
+    orderTaken: !!r.orderTaken,
+    status: r.status,
     createdAt: r.createdAt,
   };
 }
