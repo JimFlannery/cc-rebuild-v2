@@ -74,9 +74,14 @@ The old five-card layout (`HomeCards.tsx`) is retained for reference but no long
 |---|---|---|
 | `/` | **Built** | Two-option landing page + platform stats |
 | `/markets` | **Built** | Order cards, sidebar filters, risk sharing (no Yield Boost) |
-| `/orders/[id]` | **Built** | Order detail + partial-fill CoverForm with progress bar |
+| `/markets/[id]` | **Built** | Market order detail + partial-fill CoverForm (the fill page) |
+| `/orders` | **Built** | My Orders list — all orders placed by connected wallet, clickable rows |
+| `/orders/[id]` | **Built** | My Order detail — monitoring view with fills, actions (cancel), on-chain refs |
+| `/contracts` | **Built** | My Contracts list — matched contracts, clickable rows |
+| `/contracts/[id]` | **Built** | My Contract detail — parties, outcome, linked orders, on-chain refs |
 | `/dashboards` | **Built** | See Dashboards section below |
 | `/yieldboost` | **Built** | Open Orders (Community + P2P columns) and Place P2P Order tabs |
+| `/yieldboost/[id]` | **Built** | Loop order detail + match form — Community allows partial contribution, P2P takes full order |
 | `/hedge` | **Built** | Full order creation; see Hedge section below |
 | `/learn` | **Built** | 6 lessons, YouTube embed; nav label is "Learn-to-Earn" |
 | `/rewards` | **Built** | Token Rewards content from prototype (no Points, no images) |
@@ -84,8 +89,6 @@ The old five-card layout (`HomeCards.tsx`) is retained for reference but no long
 | `/feedback` | Stub | Link moved to footer |
 | `/profile` | Stub | |
 | `/notifications` | Stub | |
-| `/orders` | Stub | Order list page |
-| `/contracts` | Stub | |
 | `/invite` | Stub | Link in footer |
 | `/legal` | **Built** | Full disclaimer from prototype sidebar popup |
 
@@ -132,9 +135,25 @@ Spec: `app/hedge/CLAUDE.md`
 
 **Two tabs:**
 1. **Open Orders** (default) — two-column layout:
-   - **Community Orders** (left) — pool-based, $2,000 SSTM minimum, 2 loops, longer durations. Displays as a card with progress bar (coverage sought/filled). "Join Pool" opens modal with amount input, min/max validation, acknowledgement checkbox.
-   - **Peer-to-Peer Orders** (right) — direct matching, $50,000 SSTM minimum. Table with Counterparty, Coverage, Loops, Contract, APY, Expires, Match button.
+   - **Community Orders** (left) — pool-based, $2,000 SSTM minimum, 2 loops, longer durations. Displays as a card with progress bar (coverage sought/filled). "Join Pool" button navigates to `/yieldboost/[id]`.
+   - **Peer-to-Peer Orders** (right) — direct matching, $50,000 SSTM minimum. Table with Counterparty, Coverage, Loops, Contract, APY, Expires, Match button. "Match" navigates to `/yieldboost/[id]`.
 2. **Place P2P Order** — full order form with coverage input ($50k min enforced), loops slider, contract/order duration, yield projections panel.
+
+### `/yieldboost/[id]` — Loop Order Detail + Match
+
+Public detail + match form for a single loop order. Handles both Community pools and Peer-to-Peer orders in one page, with branching UI based on `isCommunityOrder`.
+
+**Files:**
+- `app/yieldboost/[id]/page.tsx` — Server component; fetches order via `getLoopOrderById`, settings, prices, tiers.
+- `app/yieldboost/[id]/MatchForm.tsx` — Client component; the on-chain match flow (createOrder ×2, createLoopSet, matchOrder ×2, registerLoopContract ×2, MySQL write).
+
+**Flow:**
+- **Community:** amount input ($2,000 min, capped at pool remaining) + acknowledgement + "Join Pool". Fills partially; default number of loops from settings.
+- **P2P:** shows full order summary, no amount input; takes the entire order on match. Acknowledgement + "Match Order".
+- Self-match blocked (own-order detection via connected wallet).
+- P2P orders already matched (`OrderTaken=1`) show a notice instead of the form.
+
+This replaces the previous modal-based flow on `/yieldboost` — all match logic now lives on this dedicated URL.
 
 **Key design decisions:**
 - Yield Boost is completely separate from Markets. No Yield Boost badges/options on market orders.
@@ -142,11 +161,13 @@ Spec: `app/hedge/CLAUDE.md`
 - SSTM price is locked at order creation time (`SSTMPriceAtCreation`). Tier calculations use this locked price, not current market price.
 - Community Yield Boost uses longer contract durations than Markets to stabilize TVL and justify higher returns.
 
-### `/orders/[id]` — Order Detail + Partial-Fill Cover
+### `/markets/[id]` — Market Order Detail + Partial-Fill Cover
+
+Public fill page. Any connected wallet can browse and submit Cover against the hedge order displayed here. Linked from `/markets` cards.
 
 **Files:**
-- `app/orders/[id]/page.tsx` — Server component; fetches order, tiers, prices.
-- `app/orders/[id]/CoverForm.tsx` — Client component; coverage amount input, on-chain submission, partial fills.
+- `app/markets/[id]/page.tsx` — Server component; fetches order, tiers, prices.
+- `app/markets/[id]/CoverForm.tsx` — Client component; coverage amount input, on-chain submission, partial fills.
 
 **Partial fill flow:**
 - User enters coverage amount ($10 minimum, capped at remaining unfilled amount).
@@ -155,6 +176,34 @@ Spec: `app/hedge/CLAUDE.md`
 - Tier/APY calculated on collective coverage (already filled + new contribution).
 - On submit: on-chain `create_order` (Cover type), MySQL `createCoverOrder`, then `updateCoverageFilled`.
 - When `CoverageFilled >= Coverage`, order is closed (`OrderTaken = 1, Status = 'Matched'`).
+
+### `/orders/[id]` — My Order Detail (Monitoring)
+
+Owner-only monitoring page. Wallet must match `Orders.WalletAddress` or the page 404s. Linked from `/orders` rows (all rows are clickable — both Hedge and Cover).
+
+**Files:**
+- `app/orders/[id]/page.tsx` — Client component; fetches via `getMyOrderById`, shows order details, fills, cancel action.
+
+**Sections:**
+- Header with Type badge + Status badge + condition
+- `OrderDetailsGrid` (shared component)
+- Fill Progress bar (Hedge only)
+- Matched Contracts table (Hedge only, each row links to `/contracts/[id]`)
+- Linked Hedge Order card (Cover only, links to `/markets/[id]`)
+- `SettlementExplainer` (shared)
+- `OnChainRefs` (shared — wallet, order address, mint)
+- Action panel with Cancel Order button (only if Status=Open and `CoverageFilled=0`)
+
+**Cancel behavior:** DB-only today — flips `Status='Cancelled'`. TODO: add on-chain `cancel_order` + escrow refund once the `condition_cover` instruction lands. See `cancelOrder.ts`.
+
+### `/contracts/[id]` — My Contract Detail
+
+Owner-only (must be Hedge or Cover party). Linked from `/contracts` rows.
+
+**Files:**
+- `app/contracts/[id]/page.tsx` — Client component; fetches via `getContractById`.
+
+**Sections:** role/outcome header, contract details grid, Parties card (you highlighted), Linked Orders (user's own linked to `/orders/[id]`), settlement explainer, on-chain refs.
 
 ### `/rewards`
 Token Rewards section from prototype. Tier table (Tiers 1–5, 7–17% APY). No Points. No images.
@@ -177,8 +226,15 @@ Full legal disclaimer from prototype sidebar popup. All sections: General, No Ad
 | `createCommunityOrder.ts` | Seeds a Community Yield Boost pool order (`IsCommunityOrder = 1`) |
 | `updateCoverageFilled.ts` | Increments `CoverageFilled` on a hedge order; closes it when fully filled |
 | `getOpenHedgeOrders.ts` | Fetches open hedge orders for Markets; supports filters; includes `coverageFilled` |
-| `getOrderById.ts` | Single order fetch for `/orders/[id]` detail page |
+| `getOrderById.ts` | Public single hedge order fetch for `/markets/[id]` fill page (Hedge-only, excludes loop orders) |
+| `getMyOrderById.ts` | Owner-scoped single order fetch for `/orders/[id]`; enforces `WalletAddress` match (404 otherwise) |
+| `getOrderFills.ts` | Lists Cover orders filling a given Hedge order; joins to `Contracts` for contract id/address |
+| `getUserOrders.ts` | All orders placed by a wallet — drives `/orders` (My Orders) list |
+| `getUserContracts.ts` | Contracts where wallet is Hedge or Cover party — drives `/contracts` (My Contracts) list |
+| `getContractById.ts` | Owner-scoped single contract fetch for `/contracts/[id]`; enforces wallet is party |
+| `cancelOrder.ts` | Flips `Status='Cancelled'` in DB. Only allowed if `Status=Open`, `CoverageFilled=0`, `OrderTaken=0`, wallet matches. TODO: add on-chain cancel + escrow refund. |
 | `getOpenLoopOrders.ts` | Fetches open Yield Boost orders; returns `isCommunityOrder`, `coverageSought`, `coverageFilled` |
+| `getLoopOrderById.ts` | Single loop order fetch for `/yieldboost/[id]` (Community or P2P); includes `status`, `orderTaken` |
 | `getLoopSettings.ts` | Reads looping config from `VariableSettings` (APY, LTV, fees, max loops) |
 | `matchLoopOrder.ts` | Records P2P loop match in MySQL (LoopSets + contract pairs) |
 | `getHomePageData.ts` | Order-matching queries for homepage featured opportunities (retained, not currently used) |
@@ -197,6 +253,7 @@ Full legal disclaimer from prototype sidebar popup. All sections: General, No Ad
 | `auth-client.ts` | `useSession`, `signIn`, `signOut`, `signUp` |
 | `utils.ts` | `cn()` (clsx + tailwind-merge) |
 | `orderConstants.ts` | Payout conditions, annual odds, fixed-point encoding, mint addresses, program ID, contract durations, `matchTier()` |
+| `orderFormat.ts` | Shared formatters: `shortIndex`, `longIndex`, `formatCondition`, `formatCoverage`, `shortId`, `shortWallet`, `formatCreated`, `timeRemaining`, explorer URL helpers |
 | `idl/condition_cover.json` | Anchor IDL copy — keep in sync with `smartcontracts/target/idl/condition_cover.json` |
 
 ---
@@ -303,6 +360,7 @@ website/
 │   └── globals.css
 ├── components/
 │   ├── ui/                 ← primitive UI components
+│   ├── order/              ← shared order/contract display (OrderDetailsGrid, SettlementExplainer, OnChainRefs)
 │   ├── nav.tsx             ← top navigation (auth-state-aware)
 │   ├── theme-provider.tsx  ← next-themes wrapper
 │   ├── theme-toggle.tsx    ← light/dark toggle button

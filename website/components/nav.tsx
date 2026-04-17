@@ -238,20 +238,25 @@ export function Nav({ coverSupply = 0, coverDemand = 0 }: { coverSupply?: number
 
       {/* Row 2: Scrollable nav links */}
       <nav className="flex overflow-x-auto px-4 pb-2 gap-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {NAV_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-md font-medium transition-colors whitespace-nowrap",
-              pathname === link.href
-                ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {link.label}
-          </Link>
-        ))}
+        {NAV_LINKS.map((link) => {
+          const isActive = link.href === "/"
+            ? pathname === "/"
+            : pathname === link.href || pathname.startsWith(link.href + "/");
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "shrink-0 rounded-md px-3 py-1.5 text-md font-medium transition-colors whitespace-nowrap",
+                isActive
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {link.label}
+            </Link>
+          );
+        })}
       </nav>
 
       </div>

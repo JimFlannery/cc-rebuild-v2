@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { cn } from "@/lib/utils";
 import { getUserContracts, type UserContract } from "@/app/_actions/getUserContracts";
@@ -55,8 +56,21 @@ function timeRemaining(expiration: string | null): string {
   return `${hours}h`;
 }
 
+function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+function formatCreated(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${date} ${time}`;
+}
+
 export default function ContractsPage() {
   const { connected, publicKey } = useWallet();
+  const router = useRouter();
   const [contracts, setContracts] = useState<UserContract[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -132,6 +146,7 @@ export default function ContractsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-200 dark:bg-gray-800 text-left">
+                    <th className="px-3 py-2 font-medium">Contract ID</th>
                     <th className="px-3 py-2 font-medium">Role</th>
                     <th className="px-3 py-2 font-medium">Outcome</th>
                     <th className="px-3 py-2 font-medium">Payout Condition</th>
@@ -141,13 +156,21 @@ export default function ContractsPage() {
                     <th className="px-3 py-2 font-medium">Time Left</th>
                     <th className="px-3 py-2 font-medium">Counterparty</th>
                     <th className="px-3 py-2 font-medium">Oracle Checks</th>
+                    <th className="px-3 py-2 font-medium">Created</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.map((c) => {
                     const outcome = outcomeLabel(c.contractOutcome, c.role);
                     return (
-                      <tr key={c.id} className="hover:bg-accent/30 transition-colors">
+                      <tr
+                        key={c.id}
+                        className="hover:bg-accent/30 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/contracts/${c.id}`)}
+                      >
+                        <td className="px-3 py-2.5 text-xs font-mono text-muted-foreground">
+                          {shortId(c.id)}
+                        </td>
                         <td className="px-3 py-2.5 text-xs">
                           <span className={cn(
                             "px-2 py-0.5 rounded text-xs font-medium",
@@ -172,6 +195,9 @@ export default function ContractsPage() {
                           {shortWallet(c.counterparty)}
                         </td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground">{c.oracleChecks}</td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                          {formatCreated(c.created)}
+                        </td>
                       </tr>
                     );
                   })}

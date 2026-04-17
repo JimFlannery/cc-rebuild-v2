@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTokenPrices } from "./_actions/prices";
 import { getMarketMetrics } from "./_actions/getDashboardMetrics";
 
-export const metadata = { title: "ConditionCover — Space Weather Risk Marketplace" };
+export const metadata = { title: "ConditionCover — Environmental Risk Marketplace" };
 
 function usd(n: number, decimals = 0) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
@@ -20,12 +20,15 @@ export default async function Home() {
       {/* ── Hero tagline ───────────────────────────────────────────────────── */}
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Space Weather Risk Marketplace
+          Environmental Risk Marketplace
         </h1>
-        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
-          Earn income by supplying coverage against rare geomagnetic events, or
-          go delta neutral for risk-free yield. All contracts settle automatically
-          via Chainlink oracle and live NOAA data.
+        <p className="text-sm sm:text-base text-muted-foreground max-w-3xl mx-auto">
+          Transfer environmental risk in space and on Earth. Earn income by
+          supplying coverage, or go delta neutral for risk-free yield. All
+          contracts settle automatically via Chainlink oracle and live data.
+        </p>
+        <p className="text-xs text-muted-foreground max-w-2xl mx-auto pt-1">
+          Launching with <span className="font-medium text-foreground">Space Weather</span> — terrestrial markets to follow.
         </p>
       </div>
 

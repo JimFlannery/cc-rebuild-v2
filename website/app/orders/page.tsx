@@ -29,6 +29,17 @@ function formatCoverage(n: number): string {
   return `$${n.toFixed(0)}`;
 }
 
+function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+function formatCreated(iso: string | Date): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${date} ${time}`;
+}
+
 function statusBadge(status: string): string {
   switch (status) {
     case "Open": return "text-blue-500";
@@ -127,6 +138,7 @@ export default function OrdersPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-200 dark:bg-gray-800 text-left">
+                    <th className="px-3 py-2 font-medium">Order ID</th>
                     <th className="px-3 py-2 font-medium">Type</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Payout Condition</th>
@@ -143,10 +155,11 @@ export default function OrdersPage() {
                     <tr
                       key={order.id}
                       className="hover:bg-accent/30 transition-colors cursor-pointer"
-                      onClick={() => {
-                        if (order.orderType === "Hedge") router.push(`/orders/${order.id}`);
-                      }}
+                      onClick={() => router.push(`/orders/${order.id}`)}
                     >
+                      <td className="px-3 py-2.5 text-xs font-mono text-muted-foreground">
+                        {shortId(order.id)}
+                      </td>
                       <td className="px-3 py-2.5 text-xs">
                         <span className={cn(
                           "px-2 py-0.5 rounded text-xs font-medium",
@@ -166,8 +179,8 @@ export default function OrdersPage() {
                       <td className="px-3 py-2.5 text-xs">${order.adjustedHedgePremium.toFixed(2)}</td>
                       <td className="px-3 py-2.5 text-xs">{order.denomination}</td>
                       <td className="px-3 py-2.5 text-xs">{order.contractDuration}d</td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                        {new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatCreated(order.createdAt)}
                       </td>
                     </tr>
                   ))}

@@ -112,7 +112,7 @@ export function MarketsClient({
   }, [orders, category, indexFilter, denomFilter, minCov, maxCov, minProb, maxProb, minDur, maxDur]);
 
   function handleCardClick(order: OpenHedgeOrder) {
-    router.push(`/orders/${order.id}`);
+    router.push(`/markets/${order.id}`);
   }
 
   function resetFilters() {

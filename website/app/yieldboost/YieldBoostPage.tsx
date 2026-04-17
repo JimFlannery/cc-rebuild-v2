@@ -1,21 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { cn } from "@/lib/utils";
-import { CONTRACT_DURATIONS, matchTier, MINT_ADDRESSES, TOKEN_DECIMALS, PROGRAM_ID } from "@/lib/orderConstants";
+import { CONTRACT_DURATIONS, matchTier } from "@/lib/orderConstants";
 import { createLoopOrder } from "@/app/_actions/createLoopOrder";
-import { matchLoopOrder } from "@/app/_actions/matchLoopOrder";
 import { Tooltip } from "@/components/tooltip";
 import type { LoopSettings } from "@/app/_actions/getLoopSettings";
 import type { TokenPrices } from "@/app/_actions/prices";
 import type { OpenLoopOrder } from "@/app/_actions/getOpenLoopOrders";
 import type { Tier } from "@/app/_actions/getTiers";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const IDL = require("@/lib/idl/condition_cover.json");
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -431,13 +426,13 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
 
                   {showDetails && (
                     <div className="space-y-1.5 text-sm border-t border-border pt-3">
-                      <SummaryRow label="Your Initial Cover" value={usd(coverageNum)} small />
-                      <SummaryRow label="Treasury Loans Issued" value={usd(proj.totalLoansUsd)} small />
-                      <SummaryRow label="Gross Annual Rewards" value={usd(proj.grossAnnualRewardsUsd)} small />
-                      <SummaryRow label="Annual Interest" value={`−${usd(proj.annualInterestUsd)}`} small />
-                      <SummaryRow label="Platform Fee (upfront)" value={`−${usd(proj.upfrontFeeUsd)}`} sub="USDC" small />
+                      <SummaryRow label="Your Supplied Cover" value={usd(coverageNum)} small />
+                      <SummaryRow label="Treasury Loan" value={usd(proj.totalLoansUsd)} small />
+                      <SummaryRow label="Gross Rewards" value={usd(proj.grossAnnualRewardsUsd)} small />
+                      <SummaryRow label="Loan Interest Cost" value={`(${usd(proj.annualInterestUsd)})`} small />
+                      <SummaryRow label="Contract Service Fee (USDC)" value={`(${usd(proj.upfrontFeeUsd)})`} small />
                       <div className="border-t border-border pt-1.5">
-                        <SummaryRow label="Net Annual Income" value={usd(proj.netAnnualIncomeUsd)} bold small />
+                        <SummaryRow label="Net Return" value={usd(proj.netAnnualIncomeUsd)} bold small />
                       </div>
                       {durationNum > 0 && (
                         <SummaryRow
@@ -745,429 +740,54 @@ function P2POrderColumn({
 
 function OpenOrdersTable({ orders, settings, tiers }: { orders: OpenLoopOrder[]; settings: LoopSettings; tiers: Tier[] }) {
   const { connected, publicKey } = useWallet();
-  const anchorWallet = useAnchorWallet();
-  const { connection } = useConnection();
+  const router = useRouter();
   const myWallet = publicKey?.toBase58() ?? "";
-
-  const [matchTarget, setMatchTarget] = useState<OpenLoopOrder | null>(null);
-  const [matching, setMatching] = useState(false);
-  const [matchResult, setMatchResult] = useState<{ ok: boolean; error?: string } | null>(null);
 
   const communityOrders = orders.filter((o) => o.isCommunityOrder);
   const p2pOrders = orders.filter((o) => !o.isCommunityOrder);
 
-  async function handleConfirmMatch(order: OpenLoopOrder) {
-    setMatching(true);
-    setMatchResult(null);
-    try {
-      if (!anchorWallet || !publicKey) throw new Error("Wallet not connected");
-
-      const tier = matchTier(tiers, order.coverageUsd);
-      const tierSettings = { ...settings, LoopRewardAPY: tier?.APY ?? 0, LoopLoanAPR: tier?.LoopLoanAPR ?? settings.LoopLoanAPR };
-      const proj = calcProjections(order.coverageUsd, order.numLoops, tierSettings);
-      if (!proj) throw new Error("Could not calculate projections");
-
-      const sstmMint = new PublicKey(MINT_ADDRESSES.SSTM);
-      const programPubkey = new PublicKey(PROGRAM_ID);
-      const provider = new AnchorProvider(connection, anchorWallet, { commitment: "confirmed" });
-      const program = new Program(IDL, provider);
-
-      const user1Pubkey = new PublicKey(order.walletAddress);
-      const user2Pubkey = publicKey;
-      const loopNonce = new BN(Date.now());
-      const nonceBuf = loopNonce.toArrayLike(Buffer, "le", 8);
-
-      // ── Derive seed order PDAs (user1's pre-existing orders) ──────────────
-      // User1 created their cover order with nonce embedded in their DB record.
-      // For now we re-derive from the stored OrderAddress. In production the
-      // frontend fetches the four order PDAs from the DB before calling this.
-      // TODO: fetch user1's four seed order PDAs from the Orders table via API
-      // and pass them in, rather than re-deriving here.
-      const [user1CoverOrder] = PublicKey.findProgramAddressSync(
-        [Buffer.from("order"), user1Pubkey.toBuffer(), nonceBuf],
-        programPubkey
-      );
-      const [user1HedgeOrder] = PublicKey.findProgramAddressSync(
-        [Buffer.from("order"), user1Pubkey.toBuffer(), new BN(loopNonce.toNumber() + 1).toArrayLike(Buffer, "le", 8)],
-        programPubkey
-      );
-
-      // ── User2 (matcher) creates their two seed orders ─────────────────────
-      const user2HedgeNonce = new BN(Date.now() + 2);
-      const user2CoverNonce = new BN(Date.now() + 3);
-
-      const [user2HedgeOrder] = PublicKey.findProgramAddressSync(
-        [Buffer.from("order"), user2Pubkey.toBuffer(), user2HedgeNonce.toArrayLike(Buffer, "le", 8)],
-        programPubkey
-      );
-      const [user2HedgeEscrow] = PublicKey.findProgramAddressSync(
-        [Buffer.from("escrow"), user2HedgeOrder.toBuffer()],
-        programPubkey
-      );
-      const [user2CoverOrder] = PublicKey.findProgramAddressSync(
-        [Buffer.from("order"), user2Pubkey.toBuffer(), user2CoverNonce.toArrayLike(Buffer, "le", 8)],
-        programPubkey
-      );
-      const [user2CoverEscrow] = PublicKey.findProgramAddressSync(
-        [Buffer.from("escrow"), user2CoverOrder.toBuffer()],
-        programPubkey
-      );
-
-      const user2TokenAccount = getAssociatedTokenAddressSync(sstmMint, user2Pubkey);
-      const coverageUnits = new BN(Math.round(order.coverageUsd * 10 ** TOKEN_DECIMALS));
-      // Hedge premium = coverage × payout_probability (Dst -850 = 1.2%)
-      const premiumUnits = new BN(Math.round(order.coverageUsd * 0.012 * 10 ** TOKEN_DECIMALS));
-      const expirationUnix = new BN(Math.floor(Date.now() / 1000) + order.contractDuration * 86400);
-      const DST_LEVEL = new BN(-85000); // -850 nT × 100
-
-      // Create user2 Hedge order (matches user1 Cover)
-      await (program.methods as any)
-        .createOrder(user2HedgeNonce, { hedge: {} }, { dst: {} }, DST_LEVEL,
-          coverageUnits, premiumUnits, expirationUnix, { sstm: {} })
-        .accounts({
-          order: user2HedgeOrder, escrow: user2HedgeEscrow,
-          ownerTokenAccount: user2TokenAccount, mint: sstmMint,
-          owner: user2Pubkey, tokenProgram: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-          systemProgram: SystemProgram.programId,
-        }).rpc();
-
-      // Create user2 Cover order (matches user1 Hedge)
-      await (program.methods as any)
-        .createOrder(user2CoverNonce, { cover: {} }, { dst: {} }, DST_LEVEL,
-          coverageUnits, premiumUnits, expirationUnix, { sstm: {} })
-        .accounts({
-          order: user2CoverOrder, escrow: user2CoverEscrow,
-          ownerTokenAccount: user2TokenAccount, mint: sstmMint,
-          owner: user2Pubkey, tokenProgram: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-          systemProgram: SystemProgram.programId,
-        }).rpc();
-
-      // ── Create LoopSet PDA ────────────────────────────────────────────────
-      const [loopSetPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("loop_set"), user1Pubkey.toBuffer(), user2Pubkey.toBuffer(), nonceBuf],
-        programPubkey
-      );
-      const rewardApyBps = Math.round(tierSettings.LoopRewardAPY * 10_000);
-      const loanAprBps  = Math.round(tierSettings.LoopLoanAPR   * 10_000);
-      const ltvBps      = Math.round(settings.LoopLTV        * 10_000);
-      const feeBps      = Math.round(settings.LoopFeePct     * 10_000);
-
-      await (program.methods as any)
-        .createLoopSet(loopNonce, order.numLoops,
-          rewardApyBps, loanAprBps, ltvBps, feeBps, expirationUnix)
-        .accounts({
-          loopSet: loopSetPda,
-          user1CoverOrder, user1HedgeOrder, user2HedgeOrder, user2CoverOrder,
-          creator: user2Pubkey, systemProgram: SystemProgram.programId,
-        }).rpc();
-
-      // ── Match the A-pair (user1 Cover ↔ user2 Hedge) ─────────────────────
-      const [user1CoverEscrow] = PublicKey.findProgramAddressSync(
-        [Buffer.from("escrow"), user1CoverOrder.toBuffer()], programPubkey
-      );
-      const [user1HedgeEscrow] = PublicKey.findProgramAddressSync(
-        [Buffer.from("escrow"), user1HedgeOrder.toBuffer()], programPubkey
-      );
-      const user1TokenAccount = getAssociatedTokenAddressSync(sstmMint, user1Pubkey);
-
-      // A-contract: hedge = user2HedgeOrder, cover = user1CoverOrder
-      const [contractA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("contract"), user2HedgeOrder.toBuffer(), user1CoverOrder.toBuffer()],
-        programPubkey
-      );
-      const [contractAEscrow] = PublicKey.findProgramAddressSync(
-        [Buffer.from("contract_escrow"), contractA.toBuffer()], programPubkey
-      );
-      await (program.methods as any).matchOrder()
-        .accounts({
-          contract: contractA, contractEscrow: contractAEscrow,
-          hedgeOrder: user2HedgeOrder, coverOrder: user1CoverOrder,
-          hedgeEscrow: user2HedgeEscrow, coverEscrow: user1CoverEscrow,
-          coverOwnerTokenAccount: user1TokenAccount,
-          hedgeOwnerTokenAccount: user2TokenAccount,
-          mint: sstmMint, matcher: user2Pubkey,
-          tokenProgram: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-          systemProgram: SystemProgram.programId,
-        }).rpc();
-
-      // B-contract: hedge = user1HedgeOrder, cover = user2CoverOrder
-      const [contractB] = PublicKey.findProgramAddressSync(
-        [Buffer.from("contract"), user1HedgeOrder.toBuffer(), user2CoverOrder.toBuffer()],
-        programPubkey
-      );
-      const [contractBEscrow] = PublicKey.findProgramAddressSync(
-        [Buffer.from("contract_escrow"), contractB.toBuffer()], programPubkey
-      );
-      await (program.methods as any).matchOrder()
-        .accounts({
-          contract: contractB, contractEscrow: contractBEscrow,
-          hedgeOrder: user1HedgeOrder, coverOrder: user2CoverOrder,
-          hedgeEscrow: user1HedgeEscrow, coverEscrow: user2CoverEscrow,
-          coverOwnerTokenAccount: user2TokenAccount,
-          hedgeOwnerTokenAccount: user1TokenAccount,
-          mint: sstmMint, matcher: user2Pubkey,
-          tokenProgram: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-          systemProgram: SystemProgram.programId,
-        }).rpc();
-
-      // ── Register both initial contracts into the LoopSet ──────────────────
-      for (const contractPda of [contractA, contractB]) {
-        await (program.methods as any).registerLoopContract()
-          .accounts({
-            loopSet: loopSetPda,
-            contract: contractPda,
-            caller: user2Pubkey,
-          }).rpc();
-      }
-
-      // ── Write to MySQL ────────────────────────────────────────────────────
-      await matchLoopOrder({
-        seedOrderId: order.id,
-        matcherWalletAddress: user2Pubkey.toBase58(),
-        loopSetAddress: loopSetPda.toBase58(),
-        contractAAddress: contractA.toBase58(),
-        contractBAddress: contractB.toBase58(),
-        numLoops: order.numLoops,
-        coverageUsd: order.coverageUsd,
-        contractDuration: order.contractDuration,
-        effectiveAPY: proj.effectiveAPY,
-        upfrontFeeUsd: proj.upfrontFeeUsd,
-        totalCoverUsd: proj.totalCoverUsd,
-        totalLoansUsd: proj.totalLoansUsd,
-        totalInterestUsd: proj.annualInterestUsd * order.contractDuration / 365,
-      });
-
-      setMatchResult({ ok: true });
-      setMatchTarget(null);
-    } catch (err) {
-      setMatchResult({ ok: false, error: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setMatching(false);
-    }
+  function openDetail(order: OpenLoopOrder) {
+    router.push(`/yieldboost/${order.id}`);
   }
 
   return (
-    <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* ── Community Orders (left) ─────────────────────────────────────── */}
-        <div className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold">Community Orders</h3>
-            <p className="text-xs text-muted-foreground">
-              Pool-based delta neutral &nbsp;·&nbsp; ${COMMUNITY_MIN_USD.toLocaleString("en-US")} SSTM minimum
-            </p>
-          </div>
-          <CommunityOrderColumn
-            orders={communityOrders}
-            connected={connected}
-            settings={settings}
-            tiers={tiers}
-            onMatch={(o) => { setMatchTarget(o); setMatchResult(null); }}
-            emptyMessage="No community orders currently available."
-          />
+      {/* ── Community Orders (left) ─────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Community Orders</h3>
+          <p className="text-xs text-muted-foreground">
+            Pool-based delta neutral &nbsp;·&nbsp; ${COMMUNITY_MIN_USD.toLocaleString("en-US")} SSTM minimum
+          </p>
         </div>
-
-        {/* ── Peer-to-Peer Orders (right) ─────────────────────────────────── */}
-        <div className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold">Peer-to-Peer Orders</h3>
-            <p className="text-xs text-muted-foreground">
-              Direct matching, higher tiers &nbsp;·&nbsp; ${P2P_MIN_USD.toLocaleString("en-US")} SSTM minimum
-            </p>
-          </div>
-          <P2POrderColumn
-            orders={p2pOrders}
-            myWallet={myWallet}
-            connected={connected}
-            settings={settings}
-            tiers={tiers}
-            onMatch={(o) => { setMatchTarget(o); setMatchResult(null); }}
-            emptyMessage="No peer-to-peer orders yet. Be the first — place an order and your counterparty will find you here."
-          />
-        </div>
+        <CommunityOrderColumn
+          orders={communityOrders}
+          connected={connected}
+          settings={settings}
+          tiers={tiers}
+          onMatch={openDetail}
+          emptyMessage="No community orders currently available."
+        />
       </div>
 
-      {/* Match result banner */}
-      {matchResult && (
-        <div className={cn(
-          "rounded-md p-3 text-xs mt-4",
-          matchResult.ok
-            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-        )}>
-          {matchResult.ok
-            ? "Loop set matched and deployed successfully! Initial contracts are now active."
-            : <><span className="font-semibold">Match failed: </span>{matchResult.error}</>
-          }
-        </div>
-      )}
-
-      {/* Match confirmation modal — P2P orders */}
-      {matchTarget && !matchTarget.isCommunityOrder && (() => {
-        const proj = calcProjections(matchTarget.coverageUsd, matchTarget.numLoops, settings);
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="w-full max-w-sm rounded-xl bg-background border border-border p-6 shadow-2xl space-y-4">
-              <h3 className="text-base font-semibold">Confirm Match</h3>
-              <p className="text-xs text-muted-foreground">
-                You will create two seed orders and deploy the initial contract pair on-chain.
-                Subsequent loan loops will be available to deploy from your Orders page.
-              </p>
-              <div className="space-y-2 text-sm">
-                <SummaryRow label="Counterparty" value={shortWallet(matchTarget.walletAddress)} />
-                <SummaryRow label="Coverage (each)" value={usd(matchTarget.coverageUsd)} />
-                <SummaryRow label="Loops" value={String(matchTarget.numLoops)} />
-                <SummaryRow label="Contract Duration" value={`${matchTarget.contractDuration} days`} />
-                {proj && (
-                  <>
-                    <SummaryRow label="Leverage" value={`${proj.leverage.toFixed(2)}×`} />
-                    <SummaryRow label="Effective APY" value={pct(proj.effectiveAPY)} valueClass="text-green-600 dark:text-green-400" />
-                    <SummaryRow label="Upfront Fee" value={usd(proj.upfrontFeeUsd)} sub="USDC" />
-                  </>
-                )}
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => { setMatchTarget(null); setMatchResult(null); }}
-                  disabled={matching}
-                  className="flex-1 rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleConfirmMatch(matchTarget)}
-                  disabled={matching}
-                  className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {matching ? "Deploying…" : "Confirm & Deploy"}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Join Pool modal — Community orders */}
-      {matchTarget && matchTarget.isCommunityOrder && (
-        <CommunityJoinModal
-          order={matchTarget}
-          settings={settings}
-          onClose={() => { setMatchTarget(null); setMatchResult(null); }}
-          onConfirm={(amount) => {
-            // Override the order's coverage with the user's contribution for the match flow
-            handleConfirmMatch({ ...matchTarget, coverageUsd: amount, numLoops: settings.LoopDefaultLoops });
-          }}
-          matching={matching}
-        />
-      )}
-    </>
-  );
-}
-
-// ── Community Join Modal ─────────────────────────────────────────────────────
-
-function CommunityJoinModal({
-  order, settings, onClose, onConfirm, matching,
-}: {
-  order: OpenLoopOrder;
-  settings: LoopSettings;
-  onClose: () => void;
-  onConfirm: (amountUsd: number) => void;
-  matching: boolean;
-}) {
-  const [amount, setAmount] = useState("");
-  const amountNum = Math.max(0, parseInt(amount.replace(/,/g, ""), 10) || 0);
-
-  const sought = order.coverageSought ?? 0;
-  const filled = order.coverageFilled ?? 0;
-  const remaining = Math.max(0, sought - filled);
-
-  const [acknowledged, setAcknowledged] = useState(false);
-
-  const tooLow = amountNum > 0 && amountNum < COMMUNITY_MIN_USD;
-  const tooHigh = amountNum > remaining;
-  const isValid = amountNum >= COMMUNITY_MIN_USD && amountNum <= remaining && acknowledged;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-sm rounded-xl bg-background border border-border p-6 shadow-2xl space-y-4">
-        <h3 className="text-base font-semibold">Join Community Pool</h3>
-        <p className="text-xs text-muted-foreground">
-          Enter the amount of SSTM coverage you want to contribute to this community pool.
-          Your position will be delta neutral with looping managed automatically.
-        </p>
-
-        <div className="space-y-2 text-sm">
-          <SummaryRow label="Pool Seeking" value={usd(sought)} />
-          <SummaryRow label="Already Filled" value={usd(filled)} />
-          <SummaryRow label="Remaining" value={usd(remaining)} />
-          <SummaryRow label="Contract Duration" value={`${order.contractDuration} days`} />
-        </div>
-
+      {/* ── Peer-to-Peer Orders (right) ─────────────────────────────────── */}
+      <div className="space-y-3">
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">Your Contribution ($)</label>
-          <div className="relative w-full">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none">$</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={amountNum > 0 ? amountNum.toLocaleString("en-US") : ""}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/,/g, "");
-                if (/^\d*$/.test(raw)) setAmount(raw);
-              }}
-              placeholder={COMMUNITY_MIN_USD.toLocaleString("en-US")}
-              className={cn(
-                "w-full rounded-md border border-border bg-background pl-7 pr-3 py-2 text-sm",
-                (tooLow || tooHigh) && "ring-2 ring-red-500"
-              )}
-            />
-          </div>
-          {tooLow && (
-            <p className="text-xs text-red-500 mt-1">
-              Minimum contribution is ${COMMUNITY_MIN_USD.toLocaleString("en-US")}
-            </p>
-          )}
-          {tooHigh && (
-            <p className="text-xs text-red-500 mt-1">
-              Exceeds remaining capacity of {usd(remaining)}
-            </p>
-          )}
+          <h3 className="text-sm font-semibold">Peer-to-Peer Orders</h3>
+          <p className="text-xs text-muted-foreground">
+            Direct matching, higher tiers &nbsp;·&nbsp; ${P2P_MIN_USD.toLocaleString("en-US")} SSTM minimum
+          </p>
         </div>
-
-        <label className="flex items-start gap-2 text-xs cursor-pointer">
-          <input
-            type="checkbox"
-            checked={acknowledged}
-            onChange={(e) => setAcknowledged(e.target.checked)}
-            className="mt-0.5 accent-primary shrink-0"
-          />
-          <span>
-            I understand that joining this pool locks my SSTM tokens in a delta neutral
-            looping position for the full contract duration and agree to the{" "}
-            <a href="/legal" className="underline" target="_blank" rel="noopener noreferrer">
-              terms and legal disclaimer
-            </a>.
-          </span>
-        </label>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={onClose}
-            disabled={matching}
-            className="flex-1 rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onConfirm(amountNum)}
-            disabled={matching || !isValid}
-            className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {matching ? "Deploying…" : "Confirm & Join"}
-          </button>
-        </div>
+        <P2POrderColumn
+          orders={p2pOrders}
+          myWallet={myWallet}
+          connected={connected}
+          settings={settings}
+          tiers={tiers}
+          onMatch={openDetail}
+          emptyMessage="No peer-to-peer orders yet. Be the first — place an order and your counterparty will find you here."
+        />
       </div>
     </div>
   );
