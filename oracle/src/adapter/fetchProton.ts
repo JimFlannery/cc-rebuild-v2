@@ -31,7 +31,7 @@ export async function fetchProton(): Promise<IndexReading> {
     throw new Error(`NOAA proton fetch failed: ${res.status} ${res.statusText}`);
   }
 
-  const records: ProtonRecord[] = await res.json();
+  const records = (await res.json()) as ProtonRecord[];
   if (!records.length) throw new Error('NOAA proton: empty response');
 
   const channel = records.filter(r => r.energy === ENERGY_CHANNEL);

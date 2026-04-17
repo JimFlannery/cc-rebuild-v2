@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getOrderById } from "@/app/_actions/getOrderById";
 import { getTiers } from "@/app/_actions/getTiers";
 import { getTokenPrices } from "@/app/_actions/prices";
+import { matchTier } from "@/lib/orderConstants";
 import { CoverForm } from "./CoverForm";
 
 interface Props {
@@ -30,6 +31,12 @@ export default async function OrderDetailPage({ params }: Props) {
   if (!order) notFound();
 
   const isOpen = !order.orderTaken;
+
+  const filled = order.coverageFilled ?? 0;
+  const currentTier = filled > 0 ? matchTier(tiers, filled) : null;
+  const currentAPY = currentTier?.APY ?? 0;
+  const maxTier = matchTier(tiers, order.coverage);
+  const maxAPY = maxTier?.APY ?? 0;
 
   const indexShort = order.indexName.includes("Disturbance") ? "Dst"
     : order.indexName.includes("Planetary") ? "Kp"
@@ -94,6 +101,16 @@ export default async function OrderDetailPage({ params }: Props) {
                 value={`$${(order.adjustedHedgePremium ?? order.hedgePremium).toFixed(2)}`}
               />
               <DetailItem label="Currency" value={order.denomination} />
+              <DetailItem
+                label="Current APY"
+                value={filled > 0 ? `${(currentAPY * 100).toFixed(1)}%` : "—"}
+                valueClass="text-green-600 dark:text-green-400"
+              />
+              <DetailItem
+                label="Max APY"
+                value={maxAPY > 0 ? `${(maxAPY * 100).toFixed(1)}%` : "—"}
+                valueClass="text-green-600 dark:text-green-400"
+              />
               <DetailItem
                 label="Order Expires"
                 value={order.formattedExpiration ?? "Good-till-cancelled"}

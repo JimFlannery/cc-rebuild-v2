@@ -40,7 +40,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
           onClose();
         }
       } else {
-        const result = await signUp.email({ name, email, password });
+        const result = await signUp.email({ name, email, password, walletAddress: "" });
         if (result.error) {
           setError(result.error.message ?? "Sign up failed.");
         } else {

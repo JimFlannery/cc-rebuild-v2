@@ -64,7 +64,7 @@ export function Nav({ coverSupply = 0, coverDemand = 0 }: { coverSupply?: number
     if (wallet) {
       connect().catch(() => {});
     } else {
-      select("Phantom");
+      select("Phantom" as any);
       setConnectPending(true);
     }
   }

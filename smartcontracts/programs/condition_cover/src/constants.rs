@@ -9,11 +9,6 @@ pub const ORACLE_AUTHORITY: Pubkey = pubkey!("Dtp4xjj7S56J7FFLPm5TFqA8kd3FDfNdkg
 
 /// The admin wallet authorized to call `init_treasury` and `fund_treasury`.
 ///
-/// TODO (before private devnet / cloud deployment):
-///   1. Generate a dedicated admin keypair:
-///        solana-keygen new -o ~/.config/solana/admin-keypair.json
-///   2. Replace this pubkey with the new admin pubkey.
-///   3. Keep the admin keypair offline / in a secrets manager — never commit it.
-///   4. Do NOT use the oracle keypair as admin in production.
-/// Currently set to the oracle pubkey for local testing only.
-pub const ADMIN_AUTHORITY: Pubkey = pubkey!("Dtp4xjj7S56J7FFLPm5TFqA8kd3FDfNdkgAabB4cuckx");
+/// Devnet keypair: ~/.config/solana/admin-keypair.json
+/// Generated: 2026-04-16
+pub const ADMIN_AUTHORITY: Pubkey = pubkey!("8opT7JQYLjdkvwBraHZz2p12bCvWYszL5wX41Hp4rA1q");

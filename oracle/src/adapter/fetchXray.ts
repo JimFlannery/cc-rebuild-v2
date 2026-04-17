@@ -34,7 +34,7 @@ export async function fetchXray(): Promise<IndexReading> {
     throw new Error(`NOAA X-ray fetch failed: ${res.status} ${res.statusText}`);
   }
 
-  const records: XrayRecord[] = await res.json();
+  const records = (await res.json()) as XrayRecord[];
   if (!records.length) throw new Error('NOAA X-ray: empty response');
 
   // Filter to soft X-ray channel; records are chronological.

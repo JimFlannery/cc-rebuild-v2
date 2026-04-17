@@ -198,7 +198,9 @@ pub const ORACLE_AUTHORITY: Pubkey = pubkey!("Dtp4xjj7S56J7FFLPm5TFqA8kd3FDfNdkg
 
 The off-chain oracle service (`oracle/`) signs settlement transactions with this keypair.
 
-> **TODO (pre-devnet):** Generate a dedicated `ADMIN_AUTHORITY` keypair for treasury operations (`init_treasury`, `fund_treasury`). Currently uses the same constant as a placeholder — replace before private devnet deployment.
+## Admin Authority
+
+`ADMIN_AUTHORITY` in `src/constants.rs` is a separate keypair authorized to call `init_treasury` and `fund_treasury`. Devnet keypair: `~/.config/solana/admin-keypair.json`. Never commit this keypair; store the seed phrase in a secrets manager.
 
 ---
 
@@ -265,9 +267,7 @@ Verify on [Solscan Devnet](https://solscan.io/?cluster=devnet).
 
 | Item | Notes |
 |---|---|
-| Generate dedicated `ADMIN_AUTHORITY` keypair | Replace placeholder in `constants.rs` before private devnet |
 | `cancel_loop_set` instruction | Edge case: cancel a LoopSet before all contracts are registered |
-| Deploy to private devnet | Currently local validator only |
 | Optimistic oracle dispute window | Post-devnet: replace single-step `settle` with `propose` → dispute window → `finalize` |
 
 ---

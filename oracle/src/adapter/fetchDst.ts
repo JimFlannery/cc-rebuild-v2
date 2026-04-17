@@ -28,7 +28,7 @@ export async function fetchDst(): Promise<IndexReading> {
     throw new Error(`NOAA Dst fetch failed: ${res.status} ${res.statusText}`);
   }
 
-  const rows: DstRow[] = await res.json();
+  const rows = (await res.json()) as DstRow[];
   if (rows.length < 2) throw new Error('NOAA Dst: no data rows (only header)');
 
   // Row 0 is the header ["time_tag", "dst"]; last row is most recent.

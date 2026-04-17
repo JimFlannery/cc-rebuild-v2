@@ -5,12 +5,11 @@ import { cn } from "@/lib/utils";
 
 interface TooltipProps {
   content: React.ReactNode;
-  children: React.ReactNode;
   className?: string;
   wide?: boolean;
 }
 
-export function Tooltip({ content, children, className, wide }: TooltipProps) {
+export function Tooltip({ content, className, wide }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

@@ -34,8 +34,12 @@ jobs:
             echo "── Building ──"
             npm run build
 
+            echo "── Copying static assets for standalone ──"
+            cp -r .next/static .next/standalone/.next/static
+            cp -r public .next/standalone/public
+
             echo "── Restarting PM2 process ──"
-            pm2 restart website || pm2 start npm --name "website" -- start
+            pm2 restart website || pm2 start .next/standalone/server.js --name "website"
 
             echo "── Deploy complete ──"
             pm2 status website

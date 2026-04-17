@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS Tiers (
   TotalStart       INT            NULL,
   TotalLessThan    INT            NULL,
   APY              DECIMAL(10,6)  NULL,
+  LoopLoanAPR      DECIMAL(10,6)  NULL     COMMENT 'Loan APR for Yield Boost looping at this tier',
   USDCserviceFee   DECIMAL(10,6)  NULL,
   SSTMserviceFee   DECIMAL(10,6)  NULL,
   createdAt        DATETIME       NOT NULL,

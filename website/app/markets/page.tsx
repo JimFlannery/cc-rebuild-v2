@@ -1,5 +1,6 @@
 import { getOpenHedgeOrders } from "@/app/_actions/getOpenHedgeOrders";
 import { getTiers } from "@/app/_actions/getTiers";
+import { getTokenPrices } from "@/app/_actions/prices";
 import { MarketsClient } from "./MarketsClient";
 
 export const metadata = { title: "Markets | ConditionCover" };
@@ -30,9 +31,10 @@ export default async function MarketsPage({ searchParams }: Props) {
     maxDuration:    num(sp.maxDur),
   };
 
-  const [{ orders, totalCount, spaceWeatherCount }, tiers] = await Promise.all([
+  const [{ orders, totalCount, spaceWeatherCount }, tiers, prices] = await Promise.all([
     getOpenHedgeOrders(filters),
     getTiers(),
+    getTokenPrices(),
   ]);
 
   return (
@@ -46,6 +48,7 @@ export default async function MarketsPage({ searchParams }: Props) {
       <MarketsClient
         orders={orders}
         tiers={tiers}
+        prices={prices}
         totalCount={totalCount}
         spaceWeatherCount={spaceWeatherCount}
         initialFilters={filters}

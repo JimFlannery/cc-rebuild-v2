@@ -55,6 +55,14 @@ function shortWallet(address: string | null): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
+function displayExpiration(order: OpenLoopOrder): string {
+  if (order.formattedExpiration) return order.formattedExpiration;
+  if (!order.expiration) return "—";
+  const d = new Date(order.expiration);
+  if (isNaN(d.getTime())) return "—";
+  return formatDate(d);
+}
+
 function calcProjections(
   coverageUsd: number,
   numLoops: number,
@@ -123,7 +131,7 @@ export function YieldBoostPage({ settings, prices, openOrders, tiers }: Props) {
       </div>
 
       {tab === "open" && (
-        <OpenOrdersTable orders={openOrders} settings={settings} />
+        <OpenOrdersTable orders={openOrders} settings={settings} tiers={tiers} />
       )}
       {tab === "create" && (
         <CreateOrderForm settings={settings} prices={prices} tiers={tiers} />
@@ -157,7 +165,8 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
   const durationNum = parseInt(contractDuration, 10) || 0;
   const matchedTier = matchTier(tiers, coverageNum);
   const rewardAPY = matchedTier?.APY ?? 0;
-  const effectiveSettings = { ...settings, LoopRewardAPY: rewardAPY };
+  const tierLoanAPR = matchedTier?.LoopLoanAPR ?? settings.LoopLoanAPR;
+  const effectiveSettings = { ...settings, LoopRewardAPY: rewardAPY, LoopLoanAPR: tierLoanAPR };
   const proj = calcProjections(coverageNum, numLoops, effectiveSettings);
 
   const orderDurationHrs =
@@ -376,7 +385,7 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
                 sub={matchedTier?.Name ?? undefined}
               />
               <TermRow label="Platform Fee" value={pct(settings.LoopFeePct)} sub="paid upfront in USDC" />
-              <TermRow label="Loan APR" value={pct(settings.LoopLoanAPR)} sub="from treasury" />
+              <TermRow label="Loan APR" value={pct(tierLoanAPR)} sub="from treasury" />
               <TermRow label="Loan LTV" value={pct(settings.LoopLTV)} />
             </div>
             <p className="px-6 pb-4 text-xs text-muted-foreground">
@@ -406,7 +415,7 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
                     <SummaryRow
                       label="APY Amplification"
                       value={`${proj.amplification.toFixed(2)}×`}
-                      sub={`vs ${pct(settings.LoopRewardAPY)} base`}
+                      sub={`vs ${pct(rewardAPY)} base`}
                     />
                     <SummaryRow label="Leverage Factor" value={`${proj.leverage.toFixed(2)}×`} />
                     <SummaryRow label="Total Cover Deployed" value={usd(proj.totalCoverUsd)} />
@@ -552,10 +561,12 @@ const COMMUNITY_MIN_USD = 2_000;
 const P2P_MIN_USD = 50_000;
 
 function CommunityOrderColumn({
-  orders, connected, onMatch, emptyMessage,
+  orders, connected, settings, tiers, onMatch, emptyMessage,
 }: {
   orders: OpenLoopOrder[];
   connected: boolean;
+  settings: LoopSettings;
+  tiers: Tier[];
   onMatch: (o: OpenLoopOrder) => void;
   emptyMessage: string;
 }) {
@@ -574,6 +585,22 @@ function CommunityOrderColumn({
         const filled = order.coverageFilled ?? 0;
         const remaining = Math.max(0, sought - filled);
         const pctFilled = sought > 0 ? (filled / sought) * 100 : 0;
+
+        const maxCoverage = order.coverageSought ?? order.coverageUsd;
+        const loops = order.numLoops || settings.LoopDefaultLoops;
+
+        const currentCoverage = Math.max(filled, COMMUNITY_MIN_USD);
+        const currentTier = matchTier(tiers, currentCoverage);
+        const currentAPY = currentTier?.APY ?? 0;
+        const currentLoanAPR = currentTier?.LoopLoanAPR ?? settings.LoopLoanAPR;
+        const currentSettings = { ...settings, LoopRewardAPY: currentAPY, LoopLoanAPR: currentLoanAPR };
+        const currentProj = calcProjections(currentCoverage, loops, currentSettings);
+
+        const maxTier = matchTier(tiers, maxCoverage);
+        const maxAPY = maxTier?.APY ?? 0;
+        const maxLoanAPR = maxTier?.LoopLoanAPR ?? settings.LoopLoanAPR;
+        const maxSettings = { ...settings, LoopRewardAPY: maxAPY, LoopLoanAPR: maxLoanAPR };
+        const maxProj = calcProjections(maxCoverage, loops, maxSettings);
 
         return (
           <div key={order.id} className="rounded-lg border border-border p-5 space-y-4">
@@ -609,8 +636,16 @@ function CommunityOrderColumn({
                 <span className="font-medium">{order.contractDuration} days</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Current APY</span>
+                <span className="font-medium text-green-600 dark:text-green-400">{currentProj ? pct(currentProj.effectiveAPY) : "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Max APY</span>
+                <span className="font-medium text-green-600 dark:text-green-400">{maxProj ? pct(maxProj.effectiveAPY) : "—"}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Order Expires</span>
-                <span className="font-medium">{order.formattedExpiration ?? "—"}</span>
+                <span className="font-medium">{displayExpiration(order)}</span>
               </div>
             </div>
 
@@ -630,12 +665,13 @@ function CommunityOrderColumn({
 }
 
 function P2POrderColumn({
-  orders, myWallet, connected, settings, onMatch, emptyMessage,
+  orders, myWallet, connected, settings, tiers, onMatch, emptyMessage,
 }: {
   orders: OpenLoopOrder[];
   myWallet: string;
   connected: boolean;
   settings: LoopSettings;
+  tiers: Tier[];
   onMatch: (o: OpenLoopOrder) => void;
   emptyMessage: string;
 }) {
@@ -656,7 +692,8 @@ function P2POrderColumn({
             <th className="px-3 py-2 font-medium">Coverage</th>
             <th className="px-3 py-2 font-medium">Loops</th>
             <th className="px-3 py-2 font-medium">Contract</th>
-            <th className="px-3 py-2 font-medium">APY</th>
+            <th className="px-3 py-2 font-medium">Current APY</th>
+            <th className="px-3 py-2 font-medium">Max APY</th>
             <th className="px-3 py-2 font-medium">Expires</th>
             <th className="px-3 py-2 font-medium" />
           </tr>
@@ -664,7 +701,11 @@ function P2POrderColumn({
         <tbody className="divide-y divide-border">
           {orders.map((order) => {
             const isOwn = order.walletAddress === myWallet;
-            const proj = calcProjections(order.coverageUsd, order.numLoops, settings);
+            const tier = matchTier(tiers, order.coverageUsd);
+            const baseAPY = tier?.APY ?? 0;
+            const loanAPR = tier?.LoopLoanAPR ?? settings.LoopLoanAPR;
+            const tierSettings = { ...settings, LoopRewardAPY: baseAPY, LoopLoanAPR: loanAPR };
+            const proj = calcProjections(order.coverageUsd, order.numLoops, tierSettings);
             return (
               <tr key={order.id} className={cn("hover:bg-accent/30 transition-colors", isOwn && "opacity-50")}>
                 <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
@@ -675,10 +716,13 @@ function P2POrderColumn({
                 <td className="px-3 py-2.5 text-xs">{order.numLoops}</td>
                 <td className="px-3 py-2.5 text-xs">{order.contractDuration}d</td>
                 <td className="px-3 py-2.5 text-xs text-green-600 dark:text-green-400 font-medium">
+                  {pct(baseAPY)}
+                </td>
+                <td className="px-3 py-2.5 text-xs text-green-600 dark:text-green-400 font-medium">
                   {proj ? pct(proj.effectiveAPY) : "—"}
                 </td>
                 <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                  {order.formattedExpiration ?? "—"}
+                  {displayExpiration(order)}
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <button
@@ -699,7 +743,7 @@ function P2POrderColumn({
   );
 }
 
-function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settings: LoopSettings }) {
+function OpenOrdersTable({ orders, settings, tiers }: { orders: OpenLoopOrder[]; settings: LoopSettings; tiers: Tier[] }) {
   const { connected, publicKey } = useWallet();
   const anchorWallet = useAnchorWallet();
   const { connection } = useConnection();
@@ -718,7 +762,9 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
     try {
       if (!anchorWallet || !publicKey) throw new Error("Wallet not connected");
 
-      const proj = calcProjections(order.coverageUsd, order.numLoops, settings);
+      const tier = matchTier(tiers, order.coverageUsd);
+      const tierSettings = { ...settings, LoopRewardAPY: tier?.APY ?? 0, LoopLoanAPR: tier?.LoopLoanAPR ?? settings.LoopLoanAPR };
+      const proj = calcProjections(order.coverageUsd, order.numLoops, tierSettings);
       if (!proj) throw new Error("Could not calculate projections");
 
       const sstmMint = new PublicKey(MINT_ADDRESSES.SSTM);
@@ -801,8 +847,8 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
         [Buffer.from("loop_set"), user1Pubkey.toBuffer(), user2Pubkey.toBuffer(), nonceBuf],
         programPubkey
       );
-      const rewardApyBps = Math.round(settings.LoopRewardAPY * 10_000);
-      const loanAprBps  = Math.round(settings.LoopLoanAPR   * 10_000);
+      const rewardApyBps = Math.round(tierSettings.LoopRewardAPY * 10_000);
+      const loanAprBps  = Math.round(tierSettings.LoopLoanAPR   * 10_000);
       const ltvBps      = Math.round(settings.LoopLTV        * 10_000);
       const feeBps      = Math.round(settings.LoopFeePct     * 10_000);
 
@@ -915,6 +961,8 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
           <CommunityOrderColumn
             orders={communityOrders}
             connected={connected}
+            settings={settings}
+            tiers={tiers}
             onMatch={(o) => { setMatchTarget(o); setMatchResult(null); }}
             emptyMessage="No community orders currently available."
           />
@@ -933,6 +981,7 @@ function OpenOrdersTable({ orders, settings }: { orders: OpenLoopOrder[]; settin
             myWallet={myWallet}
             connected={connected}
             settings={settings}
+            tiers={tiers}
             onMatch={(o) => { setMatchTarget(o); setMatchResult(null); }}
             emptyMessage="No peer-to-peer orders yet. Be the first — place an order and your counterparty will find you here."
           />

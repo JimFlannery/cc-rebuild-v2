@@ -33,7 +33,7 @@ export async function fetchF107(): Promise<IndexReading> {
     throw new Error(`NOAA F10.7 fetch failed: ${res.status} ${res.statusText}`);
   }
 
-  const records: F107Record[] = await res.json();
+  const records = (await res.json()) as F107Record[];
   if (!records.length) throw new Error('NOAA F10.7: empty response');
 
   // Unlike other NOAA files, f107_cm_flux.json is newest-first.

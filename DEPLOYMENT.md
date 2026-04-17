@@ -168,8 +168,10 @@ The GitHub Actions workflows use these exact PM2 names:
 
 | Service | PM2 name | Start command |
 |---|---|---|
-| Website | `website` | `pm2 start npm --name "website" -- start` |
-| Oracle | `oracle` | `pm2 start dist/index.js --name "oracle"` |
+| Website | `website` | `pm2 start website/.next/standalone/server.js --name "website"` |
+| Oracle | `oracle` | `pm2 start oracle/dist/index.js --name "oracle"` |
+
+> **Note:** The website uses Next.js `output: "standalone"` — the built server is a single `server.js` file at `.next/standalone/server.js`. After building, copy the static assets: `cp -r website/.next/static website/.next/standalone/.next/static && cp -r website/public website/.next/standalone/public`.
 
 Save the PM2 process list after first start so it survives reboots:
 ```bash

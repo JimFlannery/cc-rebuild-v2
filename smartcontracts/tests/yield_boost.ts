@@ -8,12 +8,7 @@
  *   register_loop_contract (×2) → settle (×4) → settle_loop_set
  *
  * All tests run against a local validator (anchor test).
- * The admin keypair reuses the oracle keypair for local testing only.
- *
- * TODO (before private devnet deployment):
- *   - Replace ADMIN_AUTHORITY with a dedicated admin keypair in constants.rs
- *   - Generate: solana-keygen new -o ~/.config/solana/admin-keypair.json
- *   - Fund the admin keypair on devnet before running fund_treasury
+ * Admin and oracle keypairs are loaded from ~/.config/solana/.
  */
 
 import * as anchor from "@coral-xyz/anchor";
@@ -39,12 +34,14 @@ describe("yield_boost", () => {
   const connection = provider.connection;
   const payer = (provider.wallet as anchor.Wallet).payer;
 
-  // Oracle/admin keypair — same for local testing; split before devnet.
   const oracleKeypairPath = path.join(os.homedir(), ".config", "solana", "oracle-keypair.json");
-  const adminKeypair = Keypair.fromSecretKey(
+  const adminKeypairPath = path.join(os.homedir(), ".config", "solana", "admin-keypair.json");
+  const oracleKeypair = Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(oracleKeypairPath, "utf-8")))
   );
-  const oracleKeypair = adminKeypair;
+  const adminKeypair = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(adminKeypairPath, "utf-8")))
+  );
 
   // Two whale wallets — both will be Cover parties on each other's contracts.
   const user1 = Keypair.generate();

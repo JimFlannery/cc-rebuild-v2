@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils";
 import { matchTier } from "@/lib/orderConstants";
 import type { OpenHedgeOrder, HedgeOrderFilters } from "@/app/_actions/getOpenHedgeOrders";
 import type { Tier } from "@/app/_actions/getTiers";
+import type { TokenPrices } from "@/app/_actions/prices";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Props {
   orders: OpenHedgeOrder[];
   tiers: Tier[];
+  prices: TokenPrices;
   totalCount: number;
   spaceWeatherCount: number;
   initialFilters: HedgeOrderFilters;
@@ -73,6 +75,7 @@ const INDEX_OPTIONS = [
 export function MarketsClient({
   orders,
   tiers,
+  prices,
   totalCount,
   spaceWeatherCount,
   initialFilters,
@@ -250,6 +253,7 @@ export function MarketsClient({
                 key={order.id}
                 order={order}
                 tiers={tiers}
+                prices={prices}
                 onClick={() => handleCardClick(order)}
               />
             ))}
@@ -265,14 +269,25 @@ export function MarketsClient({
 function OrderCard({
   order,
   tiers,
+  prices,
   onClick,
 }: {
   order: OpenHedgeOrder;
   tiers: Tier[];
+  prices: TokenPrices;
   onClick: () => void;
 }) {
-  const matchedTier = matchTier(tiers, order.coverage);
-  const apy = matchedTier?.APY ?? order.coverRewardAPY ?? 0;
+  const maxTier = matchTier(tiers, order.coverage);
+  const maxAPY = maxTier?.APY ?? order.coverRewardAPY ?? 0;
+
+  const filled = order.coverageFilled ?? 0;
+  const currentTier = filled > 0 ? matchTier(tiers, filled) : null;
+  const currentAPY = currentTier?.APY ?? 0;
+
+  const tokenPrice = order.denomination === "SSTM" ? prices.SSTM : 1;
+  const premiumUsd = (order.adjustedHedgePremium ?? 0) * tokenPrice;
+
+  const pctFilled = order.coverage > 0 ? (filled / order.coverage) * 100 : 0;
 
   return (
     <button
@@ -304,15 +319,31 @@ function OrderCard({
           </p>
         </div>
 
+        {/* Filled progress */}
+        <div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-muted-foreground">Filled</span>
+            <span className="font-medium">{formatCoverage(filled)} / {formatCoverage(order.coverage)}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-blue-500 transition-all duration-300"
+              style={{ width: `${Math.min(100, pctFilled)}%` }}
+            />
+          </div>
+        </div>
+
         {/* Key stats row */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-          <StatItem label="Coverage" value={formatCoverage(order.coverage)} />
+          <StatItem label="Premium" value={`$${premiumUsd.toFixed(2)}`} />
           <StatItem label="Payout Probability"
             value={formatProb(order.payoutProbability)}
             valueClass="text-red-500 dark:text-red-400" />
-          <StatItem label="Premium" value={`$${order.adjustedHedgePremium?.toFixed(2) ?? "—"}`} />
-          <StatItem label="Cover APY"
-            value={apy > 0 ? `${(apy * 100).toFixed(1)}%` : "—"}
+          <StatItem label="Current APY"
+            value={filled > 0 ? `${(currentAPY * 100).toFixed(1)}%` : "—"}
+            valueClass="text-green-600 dark:text-green-400" />
+          <StatItem label="Max APY"
+            value={maxAPY > 0 ? `${(maxAPY * 100).toFixed(1)}%` : "—"}
             valueClass="text-green-600 dark:text-green-400" />
           <StatItem label="Duration" value={`${order.contractDuration}d`} />
           <StatItem label="Expires" value={order.formattedExpiration?.split(" ").slice(0, 3).join(" ") ?? "GTC"} />

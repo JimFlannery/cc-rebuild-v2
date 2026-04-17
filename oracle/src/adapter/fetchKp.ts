@@ -21,7 +21,7 @@ export async function fetchKp(): Promise<IndexReading> {
     throw new Error(`NOAA Kp fetch failed: ${res.status} ${res.statusText}`);
   }
 
-  const rows: KpRow[] = await res.json();
+  const rows = (await res.json()) as KpRow[];
   if (rows.length < 2) throw new Error('NOAA Kp: no data rows (only header)');
 
   // Row 0 is the header ["time_tag", "Kp", ...]; last row is most recent.
