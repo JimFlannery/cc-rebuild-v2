@@ -13,7 +13,31 @@
       "Bash(find /c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts/target -name *.json -path */idl/* -o -name *.json -path */types/*)",
       "Bash(python -c ':*)",
       "Bash(pip install:*)",
-      "WebFetch(domain:learn.swyftx.com)"
+      "WebFetch(domain:learn.swyftx.com)",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc \"solana account 76R7YiSXxLGbvp4pdgBoUQ48FWeTkFHTxvggFkeXLx2M --url devnet 2>&1 | head -10\")",
+      "Bash(npx next *)",
+      "Bash(node -e \"const pool = require\\('./lib/db'\\).default; pool.query\\('SELECT id, LoopNumLoops, Coverage FROM Orders WHERE IsCommunityOrder = 1 LIMIT 5'\\).then\\(\\([r]\\) => { console.log\\(r\\); pool.end\\(\\); }\\)\")",
+      "Bash(npx tsx *)",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "Bash(node -e \"const mysql=require\\('mysql2/promise'\\);\\(async\\(\\)=>{const c=await mysql.createConnection\\({host:'localhost',user:'root',password:process.env.MYSQL_PASSWORD||'',database:'conditioncover'}\\);await c.execute\\('ALTER TABLE Tiers ADD COLUMN LoopLoanAPR DECIMAL\\(10,6\\) NULL'\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.020000 WHERE APY=0.070000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.040000 WHERE APY=0.100000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.055000 WHERE APY=0.130000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.065000 WHERE APY=0.150000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.075000 WHERE APY=0.170000\\\\\"\\);const [rows]=await c.query\\('SELECT Tier,Name,APY,LoopLoanAPR FROM Tiers ORDER BY Tier'\\);console.table\\(rows\\);await c.end\\(\\)}\\)\\(\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
+      "Bash(node -e \"const mysql=require\\('mysql2/promise'\\);\\(async\\(\\)=>{const c=await mysql.createConnection\\({host:'localhost',port:3306,user:'root',password:'a44abe11e7',database:'condition_cover'}\\);await c.execute\\('ALTER TABLE Tiers ADD COLUMN LoopLoanAPR DECIMAL\\(10,6\\) NULL'\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.020000 WHERE APY=0.070000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.040000 WHERE APY=0.100000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.055000 WHERE APY=0.130000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.065000 WHERE APY=0.150000\\\\\"\\);await c.execute\\(\\\\\"UPDATE Tiers SET LoopLoanAPR=0.075000 WHERE APY=0.170000\\\\\"\\);const [rows]=await c.query\\('SELECT Tier,Name,APY,LoopLoanAPR FROM Tiers ORDER BY Tier'\\);console.table\\(rows\\);await c.end\\(\\)}\\)\\(\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
+      "Bash(grep -E \"\\\\.rs$\")",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc ' *)",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc \"spl-token display GzHNybBLLxt7BcAs7ogTmD4m5Wnz8gRkwiHNpFkDY41S --url devnet 2>&1\")",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc \"solana-keygen pubkey ~/.config/solana/id.json && echo '---' && solana-keygen pubkey ~/.config/solana/sstm-mint-keypair.json\")",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc \"source ~/.nvm/nvm.sh && cd /mnt/c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts && npx ts-mocha --timeout 999999 -r ts-node/register scripts/devnet-yield-boost-test.ts 2>&1 | head -5\")",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc \"source ~/.nvm/nvm.sh && cd /mnt/c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts && npx ts-node --esm scripts/devnet-yield-boost-test.ts 2>&1\")",
+      "Bash(wsl -d Ubuntu-22.04 -- bash -lc \"source ~/.nvm/nvm.sh && cd /mnt/c/Users/jim-f/source/repos/cc-rebuild-v2/smartcontracts && yarn run ts-node scripts/devnet-yield-boost-test.ts 2>&1\")",
+      "Bash(git status *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(npx eslint *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\jim-f\\source\\repos\\cc-rebuild-v2\\website\\app\\orders\\[id]"
     ]
   }
 }

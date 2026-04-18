@@ -161,7 +161,13 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
   const matchedTier = matchTier(tiers, coverageNum);
   const rewardAPY = matchedTier?.APY ?? 0;
   const tierLoanAPR = matchedTier?.LoopLoanAPR ?? settings.LoopLoanAPR;
-  const effectiveSettings = { ...settings, LoopRewardAPY: rewardAPY, LoopLoanAPR: tierLoanAPR };
+  const tierFeePct = matchedTier?.USDCserviceFee ?? settings.LoopFeePct;
+  const effectiveSettings = {
+    ...settings,
+    LoopRewardAPY: rewardAPY,
+    LoopLoanAPR: tierLoanAPR,
+    LoopFeePct: tierFeePct,
+  };
   const proj = calcProjections(coverageNum, numLoops, effectiveSettings);
 
   const orderDurationHrs =
@@ -379,7 +385,11 @@ function CreateOrderForm({ settings, prices, tiers }: { settings: LoopSettings; 
                 value={coverageNum > 0 ? pct(rewardAPY) : "—"}
                 sub={matchedTier?.Name ?? undefined}
               />
-              <TermRow label="Platform Fee" value={pct(settings.LoopFeePct)} sub="paid upfront in USDC" />
+              <TermRow
+                label="Platform Fee"
+                value={coverageNum > 0 ? pct(tierFeePct) : "—"}
+                sub="paid upfront in USDC"
+              />
               <TermRow label="Loan APR" value={pct(tierLoanAPR)} sub="from treasury" />
               <TermRow label="Loan LTV" value={pct(settings.LoopLTV)} />
             </div>

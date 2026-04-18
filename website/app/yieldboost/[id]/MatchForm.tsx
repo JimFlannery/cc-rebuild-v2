@@ -94,7 +94,13 @@ export function MatchForm({ order, settings, prices, tiers }: Props) {
   const tier = matchTier(tiers, amountNum);
   const baseAPY = tier?.APY ?? 0;
   const loanAPR = tier?.LoopLoanAPR ?? settings.LoopLoanAPR;
-  const effectiveSettings = { ...settings, LoopRewardAPY: baseAPY, LoopLoanAPR: loanAPR };
+  const feePct = tier?.USDCserviceFee ?? settings.LoopFeePct;
+  const effectiveSettings = {
+    ...settings,
+    LoopRewardAPY: baseAPY,
+    LoopLoanAPR: loanAPR,
+    LoopFeePct: feePct,
+  };
   const proj = calcProjections(amountNum, numLoops, effectiveSettings);
 
   const tooLow = isCommunity && amountNum > 0 && amountNum < COMMUNITY_MIN_USD;
@@ -199,7 +205,7 @@ export function MatchForm({ order, settings, prices, tiers }: Props) {
       const rewardApyBps = Math.round(effectiveSettings.LoopRewardAPY * 10_000);
       const loanAprBps = Math.round(effectiveSettings.LoopLoanAPR * 10_000);
       const ltvBps = Math.round(settings.LoopLTV * 10_000);
-      const feeBps = Math.round(settings.LoopFeePct * 10_000);
+      const feeBps = Math.round(effectiveSettings.LoopFeePct * 10_000);
 
       await (program.methods as any)
         .createLoopSet(loopNonce, numLoops,
@@ -348,7 +354,11 @@ export function MatchForm({ order, settings, prices, tiers }: Props) {
           <div className="px-4 py-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
             <DetailItem label="Loan APR" value={pct(loanAPR)} sub="from treasury" />
             <DetailItem label="Loan LTV" value={pct(settings.LoopLTV)} />
-            <DetailItem label="Contract Service Fee" value={pct(settings.LoopFeePct)} sub="USDC, upfront" />
+            <DetailItem
+              label="Contract Service Fee"
+              value={amountNum > 0 ? pct(feePct) : "—"}
+              sub={tier ? `USDC, upfront · ${tier.Name}` : "USDC, upfront"}
+            />
             <DetailItem label="Base Reward APY" value={baseAPY > 0 ? pct(baseAPY) : "—"} sub={tier?.Name ?? undefined} />
           </div>
           <p className="px-4 pb-4 text-xs text-muted-foreground">
@@ -456,10 +466,12 @@ export function MatchForm({ order, settings, prices, tiers }: Props) {
                     <SummaryRow label="Leverage" value={`${proj.leverage.toFixed(2)}×`} />
                     <SummaryRow label="Total Cover Deployed" value={usd(proj.totalCoverUsd)} />
                     <SummaryRow label="Treasury Loan" value={usd(proj.totalLoansUsd)} />
-                    <SummaryRow label="Upfront Fee" value={usd(proj.upfrontFeeUsd)} sub="USDC" />
+                    <SummaryRow label="Gross Rewards" value={usd(proj.grossAnnualRewardsUsd)} />
+                    <SummaryRow label="Loan Interest Cost" value={`(${usd(proj.annualInterestUsd)})`} />
+                    <SummaryRow label="Contract Service Fee (USDC)" value={`(${usd(proj.upfrontFeeUsd)})`} />
                     <div className="border-t border-border pt-2">
                       <SummaryRow
-                        label={`Income (${order.contractDuration}d)`}
+                        label="Net Return"
                         value={usd(proj.netAnnualIncomeUsd * order.contractDuration / 365)}
                         bold
                       />
